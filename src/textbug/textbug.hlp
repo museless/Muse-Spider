@@ -1,0 +1,24 @@
+Textbug - one part of MuseSpider - charge in getting news context
+
+usage: textbug <Parameter>
+
+Parameter:
+
+	* Main *
+	"--help" or "-h"
+	"-c" with [configure paths]
+	"--write_disc" or "-w"
+	"--write_db" or "-d"
+
+	* Slave *
+	"-f" [SOCKETPAIR FD]
+	"-t" [20xxxxxx] such as <20150101>
+
+Warning:
+	There are two parts of parameters.
+	Main Part or Slave Part.
+	Default main part if "-d".
+	Default time is today.
+	If your today is invalid, chose today's time 
+	Just one Main part, the last will overwrite
+	the old one.

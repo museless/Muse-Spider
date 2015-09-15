@@ -1,0 +1,16 @@
+This is a info file for kernel.
+Now, there are four bugs can run.
+
+Kernel use their ID to identify them.
+Their ID is hardcode. So, do not try to
+change them.
+
+The next pattern means:
+[Bug names]	- [ID]
+
+Bug list:
+
+Urlbug	- 0
+Textbug	- 1
+Extbug	- 2
+Outbug	- 3

@@ -1,0 +1,25 @@
+Extbug - one part of MuseSpider - charge in extract news content into keyword
+
+usage: Extbug <Parameter>
+
+Parameter:
+
+	* Main *
+	"--help" or "-h"
+	"--conf" with [configure paths]
+	"--database" or "-d"
+	"--time" or "-t"
+	"--train"
+
+	* Slave *
+	"-f" [SOCKETPAIR FD]
+	"-t" [20xxxxxx] such as <20150101>
+
+Warning:
+	There are two parts of parameters.
+	Main Part or Slave Part.
+	Default main part if "-d".
+	Default time is today.
+	If your today is invalid, chose today's time 
+	Just one Main part, the last will overwrite
+	the old one.

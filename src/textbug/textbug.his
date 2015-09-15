@@ -1,0 +1,77 @@
+2015-03-02
+1.	sp_textbug.c: L918 & L981
+	text_cut_news_context & text_cut_news_context_spec
+	change: "if((inPoint = strchr(inPoint, '<')) > sentEnd || !inPoint) break;"
+		to "if((inPoint = strchr(inPoint, '<')) > sentEnd || !inPoint) inPoint = sentEnd;"
+
+	Usage: if there are not end string at the end, we should put the inPoint at the end, and make the bHead point to the
+		last '>' to copy this content.
+
+2015-03-04
+1.	sp_textbug_db.c: L65
+	fun_dberr_deal
+	change: "mysql_real_connect(&urlSql, NULL, DBUSRNAME, DBUSRKEY, dbName, 0, NULL, 0)"
+		to "mysql_real_connect(sqlHand, NULL, DBUSRNAME, DBUSRKEY, dbName, 0, NULL, 0)"
+
+
+2015-03-06
+1.	sp_textbug.c: L1096
+	text_cover_unwant_string
+	add: " if(*pEstr == '&' && *(pEstr + 1) == '#') pEstr++; "
+	between "pEstr = pString + begLen;"  and "if(!isalnum(*pEstr))"
+
+	Usage: text_cover_unwant_string can dealing both "&xxx" and "&#xxx" together.
+
+
+2015-03-09
+1.	sp_textbug.c L918
+	text_cut_news_context
+	add: "	if(text_check_context_end(bHead) == FUN_RUN_OK) {
+			bHead = NULL;
+			break;
+		} "
+
+	Usage: jmpping out the circule before some unwanted string
+
+2015-04-26
+1.	sp_textbug.c L555
+	web_httpreq_send
+	change:	"	if((fRet = web_dispose_httpreq(httpRes)) != FUN_RUN_OK) ... return fRet; "
+	to:	"	if(web_dispose_httpreq(httpRes) != FUN_RUN_OK) ... return FUN_RUN_FAIL; "
+
+2015-04-27
+1.	sp_textbug.c L532
+	web_httoreq_send
+	change:	"	fRet = ((pChar = strstr(recvData, "\r\n\r\n")) == NULL) ? 0 : (fRet - (pChar - recvData));
+			strcpy(tStru->wt_pool, pChar);
+			......
+			if((pFind = strnstr(recvData, MATCH_CHARSET, pChar - pFind))) {
+				pFind += MCHARSET_LEN;
+				if((pChar = strstr(pFind, MATCH_LINKBRK)) != NULL)
+					strncpy(tStru->wt_charset, pFind, pChar - pFind);
+			} "
+
+	to: "		fRet = ((pChar = strstr(recvData, "\r\n\r\n")) == NULL) ? 0 : (fRet - (pChar - recvData));
+			......
+			if(pChar) {
+				strcpy(tStru->wt_pool, pChar);
+		
+				if((pFind = strnstr(recvData, MATCH_CHARSET, pChar - recvData))) {
+					pFind += MCHARSET_LEN;
+					if((pChar = strstr(pFind, MATCH_LINKBRK)) != NULL)
+						strncpy(tStru->wt_charset, pFind, pChar - pFind);
+				}
+			} "
+
+	usage: pFind is an uninitialization values, it create some memory error to make unwait situation happened
+
+2015-05-02
+1.	sp_textbug.c
+	txbug_main
+	change:		change message system's working module
+			at function txbug_message_manage
+
+2.	sp_textbug.c
+	txbug_message_manage
+	change: "	static int txbug_message_manage(int msgFd) "
+	to: :		static int txbug_message_manage(int msgFd, MSLRES *pResult)

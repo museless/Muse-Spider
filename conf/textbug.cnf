@@ -1,0 +1,30 @@
+# This is textbug's configure file
+# Warning: all file name should less than 128bytes
+
+# pthread num
+# 1 <= pthread_num <= 64
+textbug_pthread_num	= 8
+textbug_read_limit	= 32
+
+# error time tolerate
+tb_errtime_tolerate	= 2
+
+# sync times
+sync_times		= 32
+
+# buf size
+textbug_contbuff_size	= 131072
+
+# file locate
+textbug_sem_key_file	= /MuseSp/bin/textbug
+default_texttmp_file	= /MuseSp/text/content.tmp
+
+# error log
+textbug_err_log		= /MuseSp/log/TextErrLog
+
+# for databases
+urls_database_name	= Url
+news_database_name	= News
+
+# help file locate
+textbug_help_document	= /MuseSp/src/textbug/textbug.hlp

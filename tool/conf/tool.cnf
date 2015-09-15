@@ -1,0 +1,19 @@
+# configure file for tool
+# tool - 0.01
+
+# about database
+urls_db_name		= Url
+
+# about paths
+urls_save_path		= /MuseSp/text/history
+conts_save_path		= /MuseSp/text/content
+
+confs_save_path		= /MuseSp/tool/text
+
+uathname_save_path	= /MuseSp/tool/text/uathname
+urladdr_save_path	= /MuseSp/tool/text/urladdr
+
+# content save path
+sppatt_header_path	= /MuseSp/include/sppatt.h
+uaddr_separate_path	= /MuseSp/tool/text/uasep
+uaddr_link_path		= /MuseSp/tool/text/ualink

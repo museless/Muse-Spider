@@ -1,0 +1,28 @@
+# This is spider's dict about wroking configure file
+# Spider ver-0.5
+# Warning: all file name should less than 128bytes
+
+# dic path #
+char_path		= /MuseSp/dict/character
+
+all_findex_path		= /MuseSp/dict/all/all_findex
+noun_findex_path	= /MuseSp/dict/noun/noun_findex
+
+all_save_path		= /MuseSp/dict/all
+noun_save_path		= /MuseSp/dict/noun
+
+delete_save_path	= /MuseSp/dict/char_delete
+
+add_keyword_script	= /MuseSp/tool/shell/add_keyword.sh
+
+cont_save_path		= /MuseSp/text/cont
+
+# db name #
+word_list_dbname	= Dictionary
+
+# table name #
+all_word_table		= t_word_all
+noun_word_table		= t_word_noun
+
+# help path #
+mkdic_help_path		= /MuseSp/src/extbug/mkdic.hlp

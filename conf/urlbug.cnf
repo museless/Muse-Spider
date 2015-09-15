@@ -1,0 +1,19 @@
+# This is urlbug's configure file
+# Warning: all file name should less than 128bytes
+
+# pthread num
+# 1 <= pthread_num <= 3
+urlbug_pthread_num	= 3
+
+# file locate
+urlbug_sem_key_file	= /MuseSp/bin/urlbug
+default_tmpfile_locate	= /MuseSp/text/url.tmp
+
+# error log
+urlbug_err_log		= /MuseSp/log/UrlErrLog
+
+# for databases
+urls_database_name	= Url
+
+# help file locate
+urlbug_help_document	= /MuseSp/src/urlbug/urlbug.hlp

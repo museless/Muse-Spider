@@ -1,0 +1,26 @@
+urlbug - one part of MuseSpider - charge in catching url
+
+usage: urlbug <Parameter>
+
+Parameter:
+
+	* Main *
+	"-c" with [configure paths]
+	"--help" or "-h"
+	"--write_disc" or "-w"
+	"--write_db" or "-d"
+	"--down_website" or "-l"
+
+	* Slave *
+	"-f" [SOCKETPAIR FD]
+	"-t" [20xxxxxx] such as <20150101>
+
+Warning:
+	There are two parts of parameters.
+	Main Part or Slave Part.
+	Default configure paths is "/MuseSp/urlbug.cnf"
+	Default main part if "-d".
+	Default time is today.
+	If your today is invalid, chose today's time 
+	Just one Main part, the last will overwrite
+	the old one.

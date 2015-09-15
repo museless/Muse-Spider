@@ -1,0 +1,36 @@
+2015-05-01
+1.	sp_message.c
+	sp_msg_read
+	change:	"
+		int sp_msg_read(int msgFd, PMSG *msgStru, int waitTime)
+		{
+			if(select_read(msgFd, (char *)msgStru, MSG_LEN, waitTime, 0) == FUN_RUN_FAIL) {
+				elog_write("sp_msg_read - select_read", FUNCTION_STR, ERROR_STR);
+				return	FUN_RUN_FAIL;
+			}
+		
+			return	FUN_RUN_OK;
+		} "
+
+	to: "
+		int sp_msg_read(int msgFd, PMSG *msgStru, int waitTime)
+		{
+			int	nRet;
+		
+			if((nRet = select_read(msgFd, (char *)msgStru, MSG_LEN, waitTime, 0)) == FUN_RUN_FAIL) {
+				elog_write("sp_msg_read - select_read", FUNCTION_STR, ERROR_STR);
+				return	FUN_RUN_FAIL;
+			}
+		
+			return	nRet;
+		} "
+
+2015-05-02
+1.	sp_message.c
+	add function
+	sp_msg_write, sp_msg_select_read
+
+2.	sp_message.c
+	sp_msg_read
+	change: "	if((nRet = select_read(msgFd, (char *)msgStru, MSG_LEN, waitTime, 0)) == FUN_RUN_FAIL) "
+	to: "		if((nRet = readn(msgFd, (char *)msgStru, MSG_LEN)) == FUN_RUN_FAIL)

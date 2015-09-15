@@ -1,0 +1,51 @@
+# This is outbug's configure file
+# Warning: all file name should less than 128bytes
+
+#######################
+# for Outbug and tools
+#######################
+
+# log locate #
+outbug_err_locate	= /MuseSp/log/OutErrLog
+
+# help file locate #
+outbug_help_locate	= /MuseSp/src/outbug/outbug.hlp
+
+# pthread num #
+outbug_pthread_num	= 2
+
+# share mem size #
+outbug_sm_size		= 4M
+
+# bucket num #
+outbug_hash_bucket_num	= 237
+
+# sync time #
+outbug_sync_sec		= 5
+outbug_sync_microsec	= 0
+
+# databases #
+keys_database_name	= Keyword
+
+# file locate #
+outbug_semkey_file	= /MuseSp/bin/outbug
+
+# dictionary locate #
+outbug_datsave_locate	= /MuseSp/text/keyword/
+
+# tools running script #
+outbug_tool_script_loca	= /MuseSp/script/outbug_tool_auto.sh
+outbug_relo_script_loca = /MuseSp/script/outbug_restart.sh
+
+###########################
+# just for Outbug's tools
+###########################
+
+# ORL rank top num #
+orl_rank_top_num	= 512
+
+# ORL download num #
+orl_sql_down_num	= 128
+
+# ORL cntlog locate #
+orl_cntlog_locate	= /MuseSp/text/keyword/cnt_log

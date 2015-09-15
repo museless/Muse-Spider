@@ -1,0 +1,8 @@
+# This is kernel's configure file
+# Warning: all file name should less than 128bytes
+
+# log locate
+kernel_err_log		= /MuseSp/log/kernErrLog
+
+# kern mempool size
+kernel_mpool_size	= 4096

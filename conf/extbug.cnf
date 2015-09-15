@@ -1,0 +1,38 @@
+# This is extbug's configure file
+# Warning: all file name should less than 128bytes
+
+# log locate #
+extbug_err_locate	= /MuseSp/log/ExtErrLog
+
+# help file locate #
+extbug_help_locate	= /MuseSp/src/extbug/extbug.hlp
+
+# pthread num #
+# should smaller than 16 #
+extbug_pthread_num	= 8
+
+# update num #
+# should smaller than 255 #
+extbug_update_max	= 128
+
+# dictionary path #
+extbug_noun_path	= /MuseSp/dict/noun
+extbug_noun_findex_path	= /MuseSp/dict/noun/noun_findex
+
+# file path #
+extbug_sem_key_file	= /MuseSp/bin/extbug
+extbug_paper_num_file	= /MuseSp/dict/char_npaper
+
+# databases #
+news_database_name	= News
+dic_database_name	= Dictionary
+keys_database_name	= Keyword
+
+# table name #
+word_table_name		= t_word_noun
+
+# klist size #
+extbug_klist_size	= 2048
+
+# script locate #
+extbug_mkdic_scri_loca	= /MuseSp/script/extbug_mkdic.sh

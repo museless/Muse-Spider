@@ -1,0 +1,29 @@
+Mkdic - one part of MuseSpider - charge in making some dictionary file
+
+usage: Mkdic <Parameter>
+
+Parameter:
+
+	* Main *
+	--add [character (all or noun)] [file type (normal or scel)]
+		[State (0 - 15)] [src file path]
+
+	--down [character (all or noun)]
+		[(1 - 3)
+			1 means with state
+			2 means without state
+			3 means Times bigger than 0 in noun table
+
+		] [dst file path]
+
+	--relist [character (normal or noun)]
+	--make_script [dst path]
+
+	* Slave *
+	--conf [conf file]
+	-help
+
+Warning:
+	There are two parts of parameters.
+	Main Part or Slave Part.
+

@@ -1,0 +1,61 @@
+/*Copyright (c) 2015, William Muse
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
+
+
+#ifndef	_SPPATT_H
+#define	_SPPATT_H
+
+#define	MOFCOM_PATTERN	1
+#define	P5W_PATTERN	2
+#define	CCSTOCK_PATTERN	3
+#define	EEO_PATTERN	4
+#define	NBD_PATTERN	5
+#define	TIMEW_PATTERN	6
+#define	GUANCHA_PATTERN	7
+#define	CNEO_PATTERN	8
+#define	CAIXIN_PATTERN	9
+#define	CANKAO_PATTERN	10
+#define	YOUTH_PATTERN	11
+#define	SECUT_PATTERN	12
+#define	CNR_PATTERN	13
+#define	PEOPLE_PATTERN	14
+#define	CNFOL_PATTERN	15
+#define	QQ_PATTERN	16
+#define	XINHUA_PATTERN	17
+#define	SINA_PATTERN	18
+#define	IFENG_PATTERN	19
+#define	CHINA_PATTERN	20
+#define	CNTV_PATTERN	21
+#define	M163_PATTERN	22
+#define	HEXUN_PATTERN	23
+#define	EASTM_PATTERN	24
+#define	CHINAN_PATTERN	25
+#define	YANGTSE_PATTERN	26
+#define	BJN_PATTERN	27
+#define	YNET_PATTERN	28
+#define	CHINAD_PATTERN	29
+#define	CFI_PATTERN	30
+#define	GMW_PATTERN	31
+
+#endif
