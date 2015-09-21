@@ -1,6 +1,6 @@
 README
 ================================
-This is the source code for MuseSp - Muse's Spider
+The source code for MuseSp - Muse's Spider
 --------------------------------
 
 ##<a name="index"/>Manual
