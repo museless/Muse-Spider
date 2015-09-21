@@ -10,6 +10,7 @@ The source code for MuseSp - Muse's Spider
 * [Attention](#Attention)
 
 ##<a name="Introduction"/>Introduction
+It's a limited web spider, it only catch html/htmls/htm, but you can alter the source code
 
 ##<a name="Author"/>Author
 Author: Muse<br>
