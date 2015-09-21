@@ -12,8 +12,8 @@ This is the source code for MuseSp - Muse's Spider
 ##<a name="Introduction"/>Introduction
 
 ##<a name="Author"/>Author
-Author: Muse
-Email: 526659043@qq.com
+Author: Muse<br>
+Email: 526659043@qq.com<br>
 
 ##<a name="Usage">Usage
 MuseSp contain Six part
