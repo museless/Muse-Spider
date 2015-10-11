@@ -1,9 +1,11 @@
 # This is urlbug's configure file
 # Warning: all file name should less than 128bytes
 
-# pthread num
-# 1 <= pthread_num <= 3
+# pthread num ( 1 ~ 3 )
 urlbug_pthread_num	= 3
+
+# url max len ( 128 ~ 256 )
+urlbug_max_ulen = 192
 
 # file locate
 urlbug_sem_key_file	= /MuseSp/bin/urlbug

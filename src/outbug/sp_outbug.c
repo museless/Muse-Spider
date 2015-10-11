@@ -1,28 +1,3 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 /*------------------------------------------
 	Source file content Seven part
 
@@ -34,7 +9,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 	Part Four:	Outbug main
 	Part Five:	Initialization
 	Part Six:	Outbug extract
-	Part Seven:	Outbug message part
 
 --------------------------------------------*/
 
@@ -125,14 +99,14 @@ static void otbug_command_analysis(int nPara, char **pComm)
 {
 	int	nCir, cOff, tFlags, hFlags;
 
-	initMsgFlags = tFlags = hFlags = 0;
+	tFlags = hFlags = 0;
 
 	for(cOff = -1, nCir = 1; nCir < nPara; nCir++) {
 		if(!strcmp(pComm[nCir], "--help") || !strcmp(pComm[nCir], "-h")) {
 			hFlags = 1; break;
 
-		} else if(!strcmp(pComm[nCir], "-l") || !strcmp(pComm[nCir], "--link")) {
-			initMsgFlags = 1;
+		} else if(!strcmp(pComm[nCir], "-f")) {
+			obProcFd = atoi(pComm[++nCir]);
 
 		} else if(!strcmp(pComm[nCir], "-t")) {
 			otbug_timbuf_init(pComm[++nCir]); tFlags = 1;
@@ -182,7 +156,7 @@ static void otbug_command_analysis(int nPara, char **pComm)
 /*-----mainly_init-----*/
 static int mainly_init(void)
 {
-	if(!sp_normal_init("Outbug", &obGarCol, (SOSET **)&obMsgSet, otbug_msg_init, "outbug_err_locate", initMsgFlags))
+	if(!sp_normal_init("Outbug", &obGarCol, (MSGSET **)&obMsgSet, otbug_msg_init, "outbug_err_locate", obProcFd))
 		return	FUN_RUN_END;
 
 	/* lock init */
@@ -238,14 +212,12 @@ static int otbug_ipc_init(void)
 	}
 
 	if(!(obShmContainer = mshm_create(keyFile, smSize, PROJ_SHM_CTL))) {
-		otbug_perror("otbug_ipc_init - mshm_create", errno);
+		perror("Outbug---> mainly_init - mshm_create");
 		return	FUN_RUN_END;
 	}
 
-	printf("Outbug---> shm index: %d\n", ((MSHM *)obShmContainer)->shm_id);
-
 	if(mgc_add(obGarCol, obShmContainer, (gcfun)mshm_destroy) == MGC_FAILED)
-		otbug_perror("otbug_ipc_init - mgc_add - mshm", errno);
+		otbug_perror("mainly_init - mgc_add - mshm", errno);
 
 	return	FUN_RUN_OK;
 }
@@ -390,8 +362,8 @@ static void otbug_work_entrance(void)
 		return;
 	}
 
-	if((nRet = otbug_script_start("outbug_tool_script_loca"))) {
-		otbug_perror("outbug_work_entrance - otbug_script_start", nRet);
+	if((nRet = otbug_tools_start())) {
+		otbug_perror("outbug_work_entrance - otbug_filectl_thread_creat", nRet);
 		return;
 	}
 
@@ -402,21 +374,12 @@ static void otbug_work_entrance(void)
 			otbug_sig_error();
 		}
 
-		pResult = mysql_store_result(&keysDataBase);
+		if(!(pResult = mysql_store_result(&keysDataBase))) {
+			if(mysql_errno(&keysDataBase))
+				otbug_dberr_dispose(&keysDataBase, keysTblName,
+				"otbug_work_entrance - mysql_store_result");
 
-		/* checking message */
-		if(initMsgFlags) {
-			nRet = sp_msgs_frame_run(obMsgSet, pResult);
-
-			if(nRet == FUN_RUN_FAIL || nRet == FUN_RUN_END) {
-				sleep(TAKE_A_NOTHING);
-				continue;
-			}
-		}
-
-		if(!pResult) {
-			sleep(TAKE_A_EYECLOSE);
-			continue;
+			otbug_sig_error();
 		}
 
 		mgc_one_add(&otResCol, pResult);
@@ -475,27 +438,3 @@ static void otbug_work_extract_string(char *keyStr)
 	otbug_tcler_unlock(obTimLock);
 	otbug_tcler_unlock(obShmCtler);
 }
-
-
-/*------------------------------------------
-	Part Seven: Outbug message part
-
-	1. otbug_time_change
-	2. otbug_keep_working
-
---------------------------------------------*/
-
-/*-----otbug_time_change-----*/
-void otbug_time_change(void)
-{
-	otbug_script_start("outbug_relo_script_loca");
-}
-
-
-/*-----otbug_keep_working-----*/
-void otbug_keep_working(void *pResult)
-{
-	if(pResult && !mysql_num_rows((MSLRES *)pResult))
-		sleep(TAKE_A_EYECLOSE);
-}
-

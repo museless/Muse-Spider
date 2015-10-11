@@ -1,46 +1,3 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
-/*------------------------------------------
-	Source file content Six part
-
-	Part Zero:	Include
-	Part One:	Local data
-	Part Two:	Local function
-	Part Three:	Define
-
-	Part Four:	Print Help tip
-	Part Five:	Disc module
-
---------------------------------------------*/
-
-
-/*------------------------------------------
-	Part Zero: Include
---------------------------------------------*/
-
 #include "spinc.h"
 #include "sphtml.h"
 #include "spnet.h"
@@ -52,18 +9,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #include "spuglobal.h"
 
 
-/*------------------------------------------
-	Part One: Local data
---------------------------------------------*/
-
+/* local data */
 static	int	datFileDes;
 
-/* extern */
-extern	inline	int	ubug_tran_disc_real(void);
-
 
 /*------------------------------------------
-	Part Four: Print Help tip
+	Part Zero: Print Help tip
 
 	1. ubug_print_help
 
@@ -106,7 +57,7 @@ void ubug_print_help(void)
 
 
 /*------------------------------------------
-	Part Five: Disc module
+	Part One: Disc module
 
 	1. ubug_disc_init
 	2. ubug_tran_disc
@@ -136,40 +87,41 @@ void ubug_disc_init(void)
 
 
 /*-----ubug_tran_disc-----*/
-void ubug_tran_disc(char *pUrl, int uLen, int numPattern)
+void ubug_tran_disc(void *pInfo, char *pUrl, int uLen)
 {
-	while(!mato_dec_and_test(&writeStoreLock))
-		mato_inc(&writeStoreLock);
+        WEBIN   *wInfo = (WEBIN *)pInfo;
+        
+	if(!buff_size_enough(urlBufStu, URL_LEN))
+                ubug_tran_disc_force(wInfo->w_buff);
 
-	if(!buff_size_enough(urlBufStu, URL_LEN)) {
-		if(ubug_tran_disc_real() == FUN_RUN_FAIL) {
-			elog_write("ubug_tran_disc - writen", FUNCTION_STR, ERROR_STR);
-			ubug_sig_error();
-		}
-	
-		buff_stru_make_empty(urlBufStu);
-	}
+	buff_size_add(wInfo->w_buff, sprintf(buff_place_end(wInfo->w_buff), 
+			"%.*s, %d\n", uLen, pUrl, wInfo->w_pattern));
+}
 
-	buff_size_add(urlBufStu, sprintf(buff_place_end(urlBufStu), 
-			"%.*s, %d\n", uLen, pUrl, numPattern)); 
 
-	mato_inc(&writeStoreLock);
+/*-----ubug_tran_disc_whole-----*/
+void ubug_tran_disc_whole(void)
+{
+        WEBIN   *pInfo;
+        
+        for (pInfo = urlSaveList; pInfo; pInfo = pInfo->w_next)
+                ubug_tran_disc_force(pInfo->w_buff);       
 }
 
 
 /*-----ubug_tran_disc_force-----*/
-void ubug_tran_disc_force(void)
+void ubug_tran_disc_force(BUFF *pBuff)
 {
 	while(!mato_dec_and_test(&writeStoreLock))
 		mato_inc(&writeStoreLock);
 
-	if(!buff_stru_empty(urlBufStu)) {
-		if(ubug_tran_disc_real() == FUN_RUN_FAIL) {
+	if(!buff_stru_empty(pBuff)) {
+		if(ubug_tran_disc_real(pBuff) == FUN_RUN_FAIL) {
 			elog_write("ubug_tran_disc_force - ubug_tran_disc_real", FUNCTION_STR, ERROR_STR);
 			ubug_sig_error();
 		}
 	
-		buff_stru_make_empty(urlBufStu);
+		buff_stru_make_empty(pBuff);
 	}
 
 	mato_inc(&writeStoreLock);
@@ -177,10 +129,10 @@ void ubug_tran_disc_force(void)
 
 
 /*-----ubug_tran_disc_real-----*/
-inline int ubug_tran_disc_real(void)
+int ubug_tran_disc_real(BUFF *pBuff)
 {
-	return	(buff_check_exist(urlBufStu)) ? writen(datFileDes, buff_place_start(urlBufStu), 
-		buff_now_size(urlBufStu)) : FUN_RUN_FAIL;
+	return	(buff_check_exist(pBuff)) ? writen(datFileDes, buff_place_start(pBuff), 
+		buff_now_size(pBuff)) : FUN_RUN_FAIL;
 }
 
 
@@ -189,3 +141,4 @@ void ubug_tran_disc_clean(void)
 {
 	
 }
+

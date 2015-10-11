@@ -1,30 +1,5 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 /*------------------------------------------
-	Source file content Seven part
+	Source file content Six part
 
 	Part Zero:	Include
 	Part One:	Define
@@ -33,7 +8,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 	Part Four:	Outbug filectl
 	Part Five:	Tmpfile control
-	Part Six:	Tool control
 
 --------------------------------------------*/
 
@@ -59,7 +33,7 @@ static	int	logFileFd, keyIndexFd, cntIndexFd, datFileFd, tmpFileFd;
 static	int	keyIndOff, cntIndOff, datFileOff;
 static	time_t	logTimeStart;
 
-static	TFCTL	tmpFileCtler = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, CTLER_SLEEP};
+static	TFCTL	tmpFileCtlStru = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0};
 static	PIDSAV	*toolPidSave = NULL;
 
 
@@ -77,9 +51,6 @@ static	int	otbug_filectl_open(int *fileDesc, char *filePath, char *fileName, int
 
 /* Part Five */
 static	void	*otbug_tmpfile_entrance(void *pPara);
-static	int	otbug_tmpfile_wait(void);
-static	void	otbug_tmpfile_wake(void);
-static	void	otbug_tmpfile_thread_kill(void);
 
 
 /*------------------------------------------
@@ -227,18 +198,12 @@ void *otbug_filectl_entrance(void *toPara)
 		newCnt = otbug_tcler_cnter(obShmCtler);
 
 		/* wake up the tmpFile ctl thread */
-		if(tmpFileTid) {
-			if(!otbug_tmpfile_wait()) {
-				printf("Outbug---> tmp file pthread was killed for no reason\n");
-				otbug_tmpfile_thread_kill();
+		pthread_mutex_lock(&tmpFileCtlStru.tf_mutex);
 
-			} else {
-				tmpFileCtler.tf_flags = CTLER_WAKE;
-				pthread_cond_signal(&tmpFileCtler.tf_cond);
-	
-				otbug_tmpfile_wake();
-			}
-		}
+		tmpFileCtlStru.tf_flags = 1;
+		pthread_cond_signal(&tmpFileCtlStru.tf_cond);
+
+		pthread_mutex_unlock(&tmpFileCtlStru.tf_mutex);
 
 		/* start to write three file */
 		if(lastCnt < newCnt) {
@@ -387,6 +352,8 @@ int otbug_filectl_thread_creat(void)
 /*-----otbug_filectl_thread_destroy-----*/
 void otbug_filectl_thread_destroy(void)
 {
+	PIDSAV	*pSaver;
+
 	otbug_tcler_lock(obShmCtler);
 
 	if(fcThreadTid) {
@@ -394,9 +361,17 @@ void otbug_filectl_thread_destroy(void)
 		pthread_join(fcThreadTid, NULL);
 	}
 
-	fcThreadTid = (pth_t)0;
+	otbug_tmpfile_lock(obShmCtler);
 
-	otbug_tmpfile_thread_kill();
+	for(pSaver = toolPidSave; pSaver; pSaver = pSaver->ps_next)
+		kill(pSaver->ps_pid, SIGINT);
+
+	if(tmpFileTid) {
+		pthread_cancel(tmpFileTid);
+		pthread_join(tmpFileTid, NULL);
+	}
+
+	pthread_mutex_unlock(&tmpFileCtlStru.tf_mutex);
 }
 
 
@@ -425,9 +400,6 @@ static int otbug_filectl_open(int *fileDesc, char *filePath, char *fileName, int
 	Part Five: Tmpfile control
 
 	1. otbug_tmpfile_entrance
-	2. otbug_tmpfile_wait
-	3. otbug_tmpfile_wake
-	4. otbug_tmpfile_thread_kill
 
 --------------------------------------------*/
 
@@ -441,24 +413,16 @@ static void *otbug_tmpfile_entrance(void *pPara)
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
 	while(FUN_RUN_OK) {
-		if((tStatus = pthread_mutex_lock(&tmpFileCtler.tf_mutex))) {
+		if((tStatus = pthread_mutex_lock(&tmpFileCtlStru.tf_mutex))) {
 			elog_write("otbug_tmpfile_entrance - pth_mutex_lock", THREAD_STR, strerror(tStatus));
 			otbug_sig_error();
 		}
 
-		tmpFileCtler.tf_flags = CTLER_SLEEP;
-		pthread_cond_signal(&tmpFileCtler.tf_cond);
-
-		while(!tmpFileCtler.tf_flags) {
-			if((tStatus = pthread_cond_wait(&tmpFileCtler.tf_cond, &tmpFileCtler.tf_mutex))) {
+		while(!tmpFileCtlStru.tf_flags) {
+			if((tStatus = pthread_cond_wait(&tmpFileCtlStru.tf_cond, &tmpFileCtlStru.tf_mutex))) {
 				elog_write("otbug_tmpfile_entrance - pth_cond_wait", THREAD_STR, strerror(tStatus));
 				otbug_sig_error();
 			}
-		}
-
-		if(tmpFileCtler.tf_flags == CTLER_QUIT) {
-			pthread_mutex_unlock(&tmpFileCtler.tf_mutex);
-			break;
 		}
 
 		otbug_tcler_inc(obShmCtler);
@@ -475,94 +439,19 @@ static void *otbug_tmpfile_entrance(void *pPara)
 			toolPidSave = pSaver;
 		}
 
-		otbug_tools_sendsig(SIGUSR1);
+		for(pSaver = toolPidSave; pSaver; pSaver = pSaver->ps_next)
+			kill(pSaver->ps_pid, SIGUSR1);
+
+		tmpFileCtlStru.tf_flags = 0;
 
 		otbug_tmpfile_unlock(obShmCtler);
 		otbug_tcler_dec(obShmCtler);
 
-		if((tStatus = pthread_mutex_unlock(&tmpFileCtler.tf_mutex))) {
+		if((tStatus = pthread_mutex_unlock(&tmpFileCtlStru.tf_mutex))) {
 			elog_write("otbug_tmpfile_entrance - pth_mutex_unlock", THREAD_STR, strerror(tStatus));
 			otbug_sig_error();
 		}
 	}
 
 	return	NULL;
-}
-
-
-/*-----otbug_tmpfile_wait-----*/
-static int otbug_tmpfile_wait(void)
-{
-	int	tStatus;
-
-	if(pthread_mutex_trylock(&tmpFileCtler.tf_mutex)) {
-		sleep(TAKE_A_NOTHING);
-
-		if(pthread_mutex_trylock(&tmpFileCtler.tf_mutex)) {
-			pthread_mutex_unlock(&tmpFileCtler.tf_mutex);
-			return	FUN_RUN_END;
-		}
-	}
-
-	while(tmpFileCtler.tf_flags != CTLER_SLEEP) {
-		if((tStatus = pthread_cond_wait(&tmpFileCtler.tf_cond, &tmpFileCtler.tf_mutex))) {
-			elog_write("otbug_tmpfile_entrance - pth_cond_wait", THREAD_STR, strerror(tStatus));
-			return	FUN_RUN_END;
-		}
-	}
-
-	return	FUN_RUN_OK;
-}
-
-
-/*-----otbug_tmpfile_wake-----*/
-static void otbug_tmpfile_wake(void)
-{
-	pthread_mutex_unlock(&tmpFileCtler.tf_mutex);
-}
-
-
-/*-----otbug_tmpfile_thread_kill-----*/
-static void otbug_tmpfile_thread_kill(void)
-{
-	otbug_tmpfile_lock(obShmCtler);
-
-	/* kill all tools */
-	otbug_tools_sendsig(SIGINT);
-
-	/* kill the tmpfile control pthread */
-	if(tmpFileTid) {
-		if(otbug_tmpfile_wait()) {
-			tmpFileCtler.tf_flags = CTLER_QUIT;
-			pthread_cond_signal(&tmpFileCtler.tf_cond);
-		
-			otbug_tmpfile_wake();
-		}
-
-		if(pthread_tryjoin_np(tmpFileTid, NULL)) {
-			pthread_cancel(tmpFileTid);
-			pthread_join(tmpFileTid, NULL);
-		}
-	}
-
-	tmpFileTid = (pth_t)0;
-
-	otbug_tmpfile_unlock(obShmCtler);
-}
-
-
-/*------------------------------------------
-	Part Seven: Tool control
-
-	1. otbug_tools_sendsig
-
---------------------------------------------*/
-
-/*-----otbug_tools_sendsig-----*/
-void otbug_tools_sendsig(int nSig)
-{
-	PIDSAV	*pSaver;
-
-	for(pSaver = toolPidSave; pSaver; pSaver = pSaver->ps_next)
-		kill(pSaver->ps_pid, nSig);
 }

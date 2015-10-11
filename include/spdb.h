@@ -1,28 +1,3 @@
-/*Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 #ifndef	_SPDB_H
 #define	_SPDB_H
 
@@ -63,7 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 #define	SQL_USTATE_LEN	0x30
 
-#define	SQL_PERCOM_MLEN	0x200
+#define	SQL_PERCOM_MLEN	0x180
 
 #define	SQL_NKILST_DEF	0x800
 
@@ -81,15 +56,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 #define	GET_DIRECTORY	"select Url, Latest from UALL where Blockmask=1"
 #define	CREAT_URL_TAB	"create table if not exists %s(ID bigint(32) not null primary key auto_increment, \
-Url char(128) not null, Pattern int(2), State bool default 0, Errt tinyint default 0)"
+Url char(%d) unique not null, Pattern int(2), State bool default 0, Errt tinyint default 0)"
 
-#define	TRAN_URL_BEG	"insert %s(Url, Pattern) values(\"%.*s\",%d)"
+#define	TRAN_URL_BEG	"insert ignore %s(Url, Pattern) values(\"%.*s\",%d)"
 #define	TRAN_URL	",(\"%.*s\",%d)"
 
 #define	REVIEW_URL	"select * from %s where Url=\"%.*s\""
 #define	UPDATE_LATEST	"update UALL set Latest=\"%.*s\" where Url=\"%s\""
 
-/* for textbug */
+/*-----------------------------
+	for textbug
+-------------------------------*/
+
 #define	URL_ID_LEN	32
 
 #define	GET_URL_LIMIT	"select ID, Url, Pattern from %s where Errt<%d and State=0 and \
@@ -129,7 +107,10 @@ union select concat(\"State = 6: \", count(ID)) Count from %s where State=6 \
 union select concat(\"Et = 1: \", count(ID)) Count from %s where Errt=1 \
 union select concat(\"Et = 2: \", count(ID)) Count from %s where Errt=2"
 
-/* Ext */
+/*-----------------------------
+	for extbug
+-------------------------------*/
+
 #define	REVIEW_WORD	"select Word from %s where Word=\"%.*s\""
 
 #define	TRAN_WD_BEG_ST	"insert %s(Word, Len, State) values(\"%.*s\",%d,%d)"
@@ -161,7 +142,10 @@ Keynum int(32) not null, Keyflags tinyint(1) default 0)"
 #define	DOWN_WORD_IDF	"select Times from %s where Word=\"%.*s\""
 #define	DOWN_KEEP_WD	" or Word=\"%.*s\""
 
-/* Outbug */
+/*-----------------------------
+	for outbug
+-------------------------------*/
+
 #define	GET_KEYWD_LIM	"select Ind, Klist from %s where Keyflags=0 limit %d"
 
 #define	SET_KEYWD_FLAGS	"update %s set Keyflags=1 where Ind=\"%s\""

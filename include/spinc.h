@@ -1,36 +1,9 @@
-/*Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 #ifndef	_SPINC_H
 #define	_SPINC_H
 
 /*---------------------------
 	include
 -----------------------------*/
-
-#define _XOPEN_SOURCE 500
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,7 +50,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #define	CHARSET_LEN	0x10
 
 #define	HEAD_LEN	0x30
-#define	WEBFILE_LEN	0x50
 
 #define	LATEST_LEN	0x40
 #define	PATH_LEN	0x80
@@ -110,7 +82,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #define	DB_INITED	0x1
 
 #define	FILE_AUTHOR	(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
-#define	SCRIPT_AUTHOR	(S_IXUSR | S_IRUSR | S_IWUSR | S_IRGRP)
 
 /* sem project id */
 #define	PROJ_PTH_CTL	0x0
@@ -125,58 +96,47 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #define	MYERR_STR(pSql)	((char *)mysql_error(pSql))
 
 /* configure read setting */
-#define	CONF_STR	0x1
-#define	CONF_NUM	0x2
+#define CONF_STR        0x1
+#define CONF_NUM        0x2
 
 /* sleep time: sec */
-#define	TAKE_A_NO	0x0
-#define	TAKE_A_SEC	0x1
-#define	TAKE_A_NOTHING	0x2
-#define	TAKE_A_EYECLOSE	0x4
-#define	TAKE_A_SHNAP	0x8
-#define	TAKE_A_NAP	0x10
-#define	TAKE_A_REST	0x20
-#define	TAKE_A_SLEEP	0x40
-#define	TAKE_A_LONGSLP	0x80
-#define	TAKE_A_LLSLP	0x12C
-
-#define	TINY_TIME	0x2
-#define	TINY_USEC	0x80000
+#define	TAKE_A_NO       0x0
+#define	TAKE_A_SEC      0x1
+#define	TAKE_A_NOTHING  0x2
+#define	TAKE_A_EYECLOSE 0x4
+#define	TAKE_A_SHNAP    0x8
+#define	TAKE_A_NAP      0x10
+#define	TAKE_A_REST     0x20
+#define	TAKE_A_SLEEP    0x40
+#define	TAKE_A_LONGSLP  0x80
+#define	TAKE_A_LLSLP    0x12C
 
 /* sleep time: microsec */
 #define	MICSEC_PER_SEC	1000000
 #define	MILLISEC_500	500000
-
-/* socket linking */
-#define	SOCK_IP		"127.0.0.1"
-#define	SOCK_PORT	12345
-#define	SOCK_BACKLOG	5
 
 
 /*---------------------------
 	typedef
 -----------------------------*/
 
-typedef	pthread_t		pth_t;
-typedef	pthread_attr_t		pattr_t;
+typedef pthread_t       pth_t;
+typedef pthread_attr_t  pattr_t;
 
-typedef	unsigned char		uChar;
-typedef	unsigned int		uInt;
-typedef	unsigned long		uLong;
-typedef	useconds_t		usec_t;
+typedef unsigned char   uChar;
+typedef unsigned int    uInt;
+typedef unsigned long   uLong;
+typedef useconds_t      usec_t;
 
-typedef	struct	stat		STAT;
-typedef	struct	tm		TMS;
-typedef	struct	timeval		TMVAL;
+typedef struct	stat    STAT;
+typedef struct	tm      TMS;
+typedef struct	timeval TMVAL;
 
-typedef	struct	buff		BUFF;
+typedef struct	buff    BUFF;
 
-typedef	struct sigaction	SIGAC;
-typedef	sigset_t		SIGSET;
-
-typedef	void	*(*mafun)(void *, int);
-typedef	void	(*mafree)(void *);
-typedef	void	(*sigfun)(int);
+typedef void	*(*mafun)(void *, int);
+typedef void	(*mafree)(void *);
+typedef void	(*sigfun)(int);
 
 
 /*---------------------------

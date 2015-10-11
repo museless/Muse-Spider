@@ -1,28 +1,3 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 #ifndef	_SPOUTB_H
 #define	_SPOUTB_H
 
@@ -54,10 +29,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #define	TC_PERWR_LEN	(TC_CNT_STRLEN + TC_MAX_TMS_LEN + TC_ENTER_LEN)
 
 #define	LOG_CHECK_DATA	0xFFFFFFFF
-
-#define	CTLER_SLEEP	0x0
-#define	CTLER_WAKE	0x1
-#define	CTLER_QUIT	0x2
 
 
 /*---------------------
@@ -134,10 +105,6 @@ struct pidsave {
     global function
 -----------------------*/
 
-/* sp_outbug.c */
-void	otbug_time_change(void);
-void	otbug_keep_working(void *pResult);
-
 /* sp_outbug_error.c */
 void	otbug_sig_error(void);
 void	otbug_perror(char *errStr, int nErr);
@@ -154,7 +121,7 @@ void	otbug_unlink_database(void *sqlHandler);
 void	otbug_unlink_database_serv(void);
 
 /* sp_outbug_message.c */
-void	*otbug_msg_init(void);
+void	*otbug_msg_init(int messageFd);
 
 /* sp_outbug_shm.c */
 void	*otbug_shm_alloc(void *pTerms, int datLen, int *numSave);
@@ -191,9 +158,8 @@ void	otbug_filectl_destroy(void *fileDes);
 int	otbug_filectl_thread_creat(void);
 void	otbug_filectl_thread_destroy(void);
 
-void	otbug_tools_sendsig(int nSig);
-
 /* sp_outbug_tool.c */
-int	otbug_script_start(char *pSearch);
+int	otbug_tools_start(void);
+
 
 #endif

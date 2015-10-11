@@ -1,72 +1,9 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
-/*------------------------------------------
-	Source file content Seven part
-
-	Part Zero:	Include
-	Part One:	Define
-	Part Two:	Local data
-	Part Three:	Local function
-
-	Part Four:	Tool main
-	Part Five:	Shared Part
-	Part Six:	Upload Part
-	Part Seven:	Download Part
-	Part Eight:	Content download
-	Part Nine:	Make pattern
-
-	Part Ten:	Error manage
-	Part Eleven:	Dispose
-
---------------------------------------------*/
-
-
-/*------------------------------------------
-	Part Zero: Include
---------------------------------------------*/
-
 #include "spinc.h"
 #include "spdb.h"
 #include "sphtml.h"
 #include "sptinc.h"
 
-
-/*------------------------------------------
-	Part One: Define
---------------------------------------------*/
-
-#define	tool_find_endsign(pEnter) \
-	for(; *pEnter != 0 && *pEnter != '$'; pEnter++) \
-		;	/* nothing */
-
-
-/*------------------------------------------
-	Part Two: Local data
---------------------------------------------*/
-
+/* local data */
 static	char	*fileStoreBuf;
 static	MYSQL	*toolSqlHandler;
 static	char	gloTabName[MIDDLE_BUF];
@@ -76,17 +13,13 @@ static	char	modFileName[FNAME_LEN];
 static	char	urlPatternStore[][PATTERN_LEN] = {
 		"mofcom.gov.cn", "p5w.net", "ccstock.cn", "eeo.com.cn", "nbd.com.cn", "time-weekly.com", "guancha.cn",
 		"cneo.com.cn", "caixin.com", "cankaoxiaoxi.com", "youth.cn", "stcn.com", "cnr.cn", "people.com.cn",
-		"cnfol.com", "qq.com", "xinhuanet.com", "sina.com.cn", "ifeng.com", "china.com.cn", "cntv.cn",
-		"163.com", "hexun.com", "eastmoney.com", "chinanews.com", "yangtse.com", "bjnews.com.cn",
+		"cnfol.com", "qq.com", "xinhuanet.com", "sina.com.cn", "ifeng.com", "china.com.cn", "cntv.cn", 
+		"163.com", "hexun.com", "eastmoney.com", "chinanews.com", "yangtse.com", "bjnews.com.cn", 
 		"ynet.com", "chinadaily.com.cn", "cfi.cn", "gmw.cn", "southcn.com"};
 
 static	int	nUrlPattern = sizeof(urlPatternStore) / sizeof(urlPatternStore[0]);
 
-
-/*------------------------------------------
-	Part Three: Local function
---------------------------------------------*/
-
+/* local function */
 static	int	tool_filebuf_init(char *fName);
 static	int	tool_file_open(char *fName);
 static	int	tool_database_init(int nDoor, char *tabName);
@@ -118,7 +51,34 @@ static	void	tool_db_shutdown(void);
 
 
 /*------------------------------------------
-	Part Four: Tool main
+	Source file content Nine part
+
+	Part Zero:	Define function
+	Part One:	Tool main
+	Part Two:	Shared Part
+	Part Three:	Upload Part
+	Part Four:	Download Part
+	Part Five:	Content download
+	Part Six:	Make pattern
+	Part NT-Nine:	Error manage
+	Part Hundred:	Dispose
+
+--------------------------------------------*/
+
+/*------------------------------------------
+	Part Zero: Define function
+
+	1. tool_find_endsign
+
+--------------------------------------------*/
+
+#define	tool_find_endsign(pEnter) \
+	for(; *pEnter != 0 && *pEnter != '$'; pEnter++) \
+		;	/* nothing */
+
+
+/*------------------------------------------
+	Part One: Tool main
 
 	1. main
 
@@ -153,7 +113,7 @@ int main(int argc, char *argv[])
 
 			tool_db_shutdown();
 			nCir += MD_UPDOWN_AOFF;
-
+	
 		} else if(!strcmp(argv[nCir], "-d") || !strcmp(argv[nCir], "--down")) {
 			if(!strcmp(argv[nCir + 1], "urls")) {
 				nDoor = URLS_DLOCKS;
@@ -170,13 +130,13 @@ int main(int argc, char *argv[])
 
 			tool_db_shutdown();
 			nCir += MD_UPDOWN_AOFF;
-
+	
 		} else if(!strcmp(argv[nCir], "--dnc")) {
 			tool_news_db_init(argv[nCir + 1]);
 			tool_tran_content();
 			tool_db_shutdown();
 			nCir += MD_DNC_AOFF;
-
+	
 		} else if(!strcmp(argv[nCir], "--make_pattern")) {
 			tool_make_pattern();
 			nCir += MD_MDPATT_AOFF;
@@ -199,7 +159,7 @@ int main(int argc, char *argv[])
 
 
 /*------------------------------------------
-	Part Five: Shared Part
+	Part Two: Shared Part
 
 	1. tool_filebuf_init
 	2. tool_database_init
@@ -322,7 +282,7 @@ static int tool_file_open(char *fName)
 
 
 /*------------------------------------------
-	Part Six: Upload Part
+	Part Three: Upload Part
 
 	1. tool_content_deal
 	2. tool_fconf_deal
@@ -368,7 +328,7 @@ static void tool_content_deal(int fSize)
 	char	*pBuf = fileStoreBuf, *pUrl, *pDot, *pEnd;
 	char	sqlBuf[SQL_LEN];
 	int	nPattern;
-
+	
 	for(; pBuf < fileStoreBuf + fSize; pBuf = pEnd) {
 		if(!(pUrl = strstr(pBuf, MATCH_HTTP)) || !(pDot = strchr(pUrl, '.')) || !(pEnd = strchr(pDot, '\n')))
 			break;
@@ -402,7 +362,7 @@ static void tool_fconf_deal(int fSize)
 			mysql_real_escape_string(toolSqlHandler, pStru + sizeBuf[nCir], pBuf, pEnter - pBuf);
 		}
 
-		sprintf(insertBuf, INSERT_CONFTAB, conStru.c_domain, conStru.c_conbeg, conStru.c_conend,
+		sprintf(insertBuf, INSERT_CONFTAB, conStru.c_domain, conStru.c_conbeg, conStru.c_conend, 
 		conStru.c_conrloc, conStru.c_timbeg, conStru.c_srcstr, conStru.c_charset);
 
 		if(mysql_query(toolSqlHandler, insertBuf) != FUN_RUN_END)
@@ -430,7 +390,7 @@ static void tool_uall_deal(int fSize)
 
 
 /*------------------------------------------
-	Part Seven: Download Part
+	Part Four: Download Part
 
 	1. tool_tran_data
 	2. tool_tran_urls
@@ -492,8 +452,8 @@ static inline int tool_tran_urls(char *sqlComm, void *myRow)
 /*-----tool_tran_conf-----*/
 static inline int tool_tran_conf(char *sqlComm, void *myRow)
 {
-	return	sprintf(sqlComm, "%s$ %s$ %s$ %s$ %s$ %s$ %s$\n", ((MYSQL_ROW)myRow)[0], ((MYSQL_ROW)myRow)[1],
-		((MYSQL_ROW)myRow)[2], ((MYSQL_ROW)myRow)[3], ((MYSQL_ROW)myRow)[4],
+	return	sprintf(sqlComm, "%s$ %s$ %s$ %s$ %s$ %s$ %s$\n", ((MYSQL_ROW)myRow)[0], ((MYSQL_ROW)myRow)[1], 
+		((MYSQL_ROW)myRow)[2], ((MYSQL_ROW)myRow)[3], ((MYSQL_ROW)myRow)[4], 
 		((MYSQL_ROW)myRow)[5], ((MYSQL_ROW)myRow)[6]);
 }
 
@@ -506,7 +466,7 @@ static inline int tool_tran_uall(char *sqlComm, void *myRow)
 
 
 /*------------------------------------------
-	Part Eight: Content download
+	Part Five: Content download
 
 	1. tool_tran_content
 	2. tool_news_db_init
@@ -554,7 +514,7 @@ static void tool_tran_content(void)
 		printf("%s cnt: %lld\n", lRow[0], mysql_num_rows(cRes));
 
 		while((cRow = mysql_fetch_row(cRes))) {
-			if(!buff_size_enough(contBuff, (strlen(cRow[0]) + strlen(cRow[1]) +
+			if(!buff_size_enough(contBuff, (strlen(cRow[0]) + strlen(cRow[1]) + 
 			strlen(cRow[2]) + strlen(cRow[3]) + strlen(cRow[4]) + 64))) {
 				write(nFd, buff_place_start(contBuff), buff_now_size(contBuff));
 				buff_stru_make_empty(contBuff);
@@ -624,7 +584,7 @@ static int tool_get_npattern(char *pUrl, int nLen)
 
 
 /*------------------------------------------
-	Part Nine: Make pattern
+	Part Six: Make pattern
 
 	1. tool_make_pattern
 	2. tool_sep_athname
@@ -731,7 +691,7 @@ static void tool_sep_uaddr(void)
 
 
 /*------------------------------------------
-	Part Ten: Error manage
+	Part NT-Nine: Error manage
 
 	1. tool_funerr_deal
 	2. tool_dberr_deal
@@ -745,7 +705,7 @@ static void tool_funerr_deal(char *pStr)
 		free(fileStoreBuf);
 
 	perror(pStr);
-	exit(FUN_RUN_END);
+	exit(FUN_RUN_END);	
 }
 
 
@@ -759,7 +719,7 @@ static void tool_dberr_deal(void)
 
 
 /*------------------------------------------
-	Part Eleven: Dispose
+	Part Hundred: Dispose
 
 	1. tool_db_shutdown
 

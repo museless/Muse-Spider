@@ -1,28 +1,3 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 /*------------------------------------------
 	Source file content Eleven part
 
@@ -49,6 +24,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #include "spnet.h"
 #include "spdb.h"
 #include "spmsg.h"
+#include "spsock.h"
 #include "sphtml.h"
 #include "spmpool.h"
 #include "spframe.h"
@@ -79,7 +55,7 @@ static	void	ubug_command_analyst(int nPara, char **pComm);
 static	int	mainly_init(void);
 static	int	ubug_init_mempool(void);
 static	void	ubug_init_datebuf(char *pTime);
-static	void	ubug_init_dbuf(void);
+static  int     ubug_init_dbuf(BUFF **pBuff);
 static	void	ubug_init_weblist(void);
 static	void	ubug_init_urllist(char *pUrl, WEB *pWeb);
 
@@ -104,19 +80,18 @@ static	int	ubug_get_pattern(char *pHost);
 static	void	ubug_check_separator(char *pUrl, int *uLen);
 static	int	ubug_check_url_prefix(char *preSrc);
 static	int	ubug_find_key_date(char *cSrc, int nLimit);
-static	char	*ubug_reach_str_http(char *pSrc, char *pLimit);
+static	char	*ubug_reach_url(char *pSrc, char *pLimit);
 
 
 /*------------------------------------------
 	Part Three: Define
 --------------------------------------------*/
 
-#define	ubug_init_ubset(fInit, fEnt, fSt, fStf, fStr, fDway, fChk, rTime) { \
+#define	ubug_init_ubset(fInit, fEnt, fSt, fStf, fDway, fChk, rTime) { \
 	urlRunSet.ubs_init = fInit; \
 	urlRunSet.ubs_fent = fEnt; \
 	urlRunSet.ubs_fst = fSt; \
 	urlRunSet.ubs_fstf = fStf; \
-	urlRunSet.ubs_fstr = fStr; \
 	urlRunSet.ubs_dway = fDway; \
 	urlRunSet.ubs_chk = fChk; \
 	urlRunSet.ubs_rtime = rTime; \
@@ -140,7 +115,6 @@ int main(int argc, char *argv[])
 		ubug_init_signal();
 		ubug_init_database();
 		ubug_init_weblist();
-		ubug_init_dbuf();
 	
 		ubug_main_entrance();
 	}
@@ -156,27 +130,25 @@ static void ubug_command_analyst(int nPara, char **pComm)
 {
 	int	nCir, cOff, tFlags = 0;
 
-	initMsgFlags = 0;
-
 	for(cOff = -1, nCir = 1; nCir < nPara; nCir++) {
 		if(!strcmp(pComm[nCir], "--help") || !strcmp(pComm[nCir], "-h")) {
 			ubug_print_help();
 			exit(FUN_RUN_OK);
 
 		} else if(!strcmp(pComm[nCir], "--write_disc") || !strcmp(pComm[nCir], "-w")) {
-			ubug_init_ubset(ubug_disc_init, ubug_text_abstract_cont, ubug_tran_disc, ubug_tran_disc_force,
-			ubug_tran_disc_real, network_down_web, NULL, RUN_ONCE);
+			ubug_init_ubset(ubug_disc_init, ubug_text_abstract_cont, ubug_tran_disc, 	
+			ubug_tran_disc_whole, network_down_web, NULL, RUN_ONCE);
 
 		} else if(!strcmp(pComm[nCir], "--write_db") || !strcmp(pComm[nCir], "-d")) {
-			ubug_init_ubset(NULL, ubug_text_abstract_cont, ubug_tran_db, ubug_tran_db_force,
-			ubug_tran_db_real, network_down_web, ubug_url_review, RUN_PERN);
+			ubug_init_ubset(NULL, ubug_text_abstract_cont, ubug_tran_db, ubug_tran_db_whole,
+			network_down_web, NULL, RUN_PERN);
 
 		} else if(!strcmp(pComm[nCir], "--down_website") || !strcmp(pComm[nCir], "-l")) {
-			ubug_init_ubset(NULL, ubug_text_store_content, NULL, NULL, NULL,
+			ubug_init_ubset(NULL, ubug_text_store_content, NULL, NULL,
 			network_down_web, NULL, RUN_ONCE);
 
-		} else if(!strcmp(pComm[nCir], "-l") || !strcmp(pComm[nCir], "--link")) {
-			initMsgFlags = 1;
+		} else if(!strcmp(pComm[nCir], "-f")) {
+			procCommuFd = atoi(pComm[++nCir]);
 
 		} else if(!strcmp(pComm[nCir], "-t")) {
 			ubug_init_datebuf(pComm[++nCir]); tFlags = 1;
@@ -193,14 +165,14 @@ static void ubug_command_analyst(int nPara, char **pComm)
 
 	if(mc_conf_load("Urlbug", ((cOff == -1) ? "/MuseSp/conf/urlbug.cnf" : pComm[cOff])) == FUN_RUN_FAIL) {
 		printf("Urlbug---> load configure failed\n");
-		perror("Urlbug---> ubug_command_analyst - mc_conf_load");
+		ubug_perror("ubug_command_analyst - mc_conf_load", errno);
 		mc_conf_unload();
 		exit(FUN_RUN_FAIL);
 	}
 
 	if(urlRunSet.ubs_fent == NULL) {
-		ubug_init_ubset(NULL, ubug_text_abstract_cont, ubug_tran_db, ubug_tran_db_force,
-		ubug_tran_db_real, network_down_web, ubug_url_review, RUN_PERN);
+		ubug_init_ubset(NULL, ubug_text_abstract_cont, ubug_tran_db, ubug_tran_db_whole,
+		network_down_web, NULL, RUN_PERN);
 	}
 
 	if(!tFlags)
@@ -223,24 +195,35 @@ static void ubug_command_analyst(int nPara, char **pComm)
 /*-----mainly_init-----*/
 static int mainly_init(void)
 {
-	if(!sp_normal_init("Urlbug", &urlGarCol, &urlMsgSet, ubug_msg_init, "urlbug_err_log", initMsgFlags))
+	if (!sp_normal_init("Urlbug", &urlGarCol, &urlMsgSet, ubug_msg_init, "urlbug_err_log", procCommuFd))
 		return	FUN_RUN_END;
 
 	mato_init(&writeStoreLock, 1);
 
 	/* urlbug pthread num read */
-	if(mc_conf_read("urlbug_pthread_num", CONF_NUM, &nRunPthread, sizeof(int)) == FUN_RUN_FAIL) {
+	if (mc_conf_read("urlbug_pthread_num", CONF_NUM, &nRunPthread, sizeof(int)) == FUN_RUN_FAIL) {
 		mc_conf_print_err("urlbug_pthread_num");
 		return	FUN_RUN_END;
 	}
 
-	if(nRunPthread > UBUG_PTHREAD_MAX || nRunPthread < UBUG_PTHREAD_MIN) {
+	if (nRunPthread > UBUG_PTHREAD_MAX || nRunPthread < UBUG_PTHREAD_MIN) {
 		printf("Urlbug---> pthread num is underlimit: %d\n", nRunPthread);
 		return	FUN_RUN_END;
 	}
 
+        /* max url len read, size of table U20xxxxxx Url field */
+	if (mc_conf_read("urlbug_max_ulen", CONF_NUM, &urlMaxLen, sizeof(int)) == FUN_RUN_FAIL) {
+		mc_conf_print_err("urlbug_max_ulen");
+		return	FUN_RUN_END;
+	}
+
+	if (urlMaxLen < MIN_URL_LEN || urlMaxLen > MAX_URL_LEN) {
+		printf("Urlbug---> url max size is underlimit: %d\n", urlMaxLen);
+		return	FUN_RUN_END;
+	}
+
 	/* muse thread pool init */
-	if(!(ubugThreadPool = mpc_create(nRunPthread))) {
+	if (!(ubugThreadPool = mpc_create(nRunPthread))) {
 		printf("Urlbug---> mainly_init - mpc_create - failed\n");
 		return	FUN_RUN_END;
 	}
@@ -252,21 +235,21 @@ static int mainly_init(void)
 /*-----ubug_init_mempool-----*/
 static int ubug_init_mempool(void)
 {
-	if((contStorePool = wmpool_create(nRunPthread, WMP_PAGESIZE)) == NULL) {
+	if ((contStorePool = wmpool_create(nRunPthread, WMP_PAGESIZE)) == NULL) {
 		printf("Urlbug---> wmpool_create - contStorePool: %s", strerror(errno));
 		return	FUN_RUN_END;
 	}
 
-	if(mgc_add(urlGarCol, contStorePool, wmpool_destroy) == MGC_FAILED)
-		perror("Urlbug---> ubug_init_mempool - mgc_add - contStorePool");
+	if (mgc_add(urlGarCol, contStorePool, wmpool_destroy) == MGC_FAILED)
+		ubug_perror("ubug_init_mempool - mgc_add - contStorePool", errno);
 
-	if((urlStorePool = wmpool_create(nRunPthread, NAMBUF_LEN)) == NULL) {
+	if ((urlStorePool = wmpool_create(nRunPthread, NAMBUF_LEN)) == NULL) {
 		printf("Urlbug---> wmpool_create - urlStorePool: %s", strerror(errno));
 		return	FUN_RUN_END;
 	}
 
-	if(mgc_add(urlGarCol, urlStorePool, wmpool_destroy) == MGC_FAILED)
-		perror("Urlbug---> ubug_init_mempool - mgc_add - urlStorePool");
+	if (mgc_add(urlGarCol, urlStorePool, wmpool_destroy) == MGC_FAILED)
+		ubug_perror("ubug_init_mempool - mgc_add - urlStorePool", errno);
 
 	return	FUN_RUN_OK;
 }
@@ -295,15 +278,17 @@ static void ubug_init_datebuf(char *pTime)
 
 
 /*-----ubug_init_dbuf-----*/
-static void ubug_init_dbuf(void)
+static int ubug_init_dbuf(BUFF **pBuff)
 {
-	if((urlBufStu = buff_stru_init(SQL_LCOM_LEN)) == NULL) {
-		perror("Urlbug---> ubug_init - buff_stru_init");
-		exit(FUN_RUN_FAIL);
+	if (((*pBuff) = buff_stru_init(SQL_LCOM_LEN)) == NULL) {
+		ubug_perror("ubug_init_dbuf - buff_stru_init", errno);
+		return  FUN_RUN_END;
 	}
 
-	if(mgc_add(urlGarCol, urlBufStu, buff_stru_free_all) == MGC_FAILED)
-		perror("Urlbug---> ubug_init_dbuf - mgc_add - urlBufStu");
+	if (mgc_add(urlGarCol, (*pBuff), buff_stru_free_all) == MGC_FAILED)
+		ubug_perror("ubug_init_dbuf - mgc_add - urlBufStu", errno);
+
+        return  FUN_RUN_OK;
 }
 
 
@@ -314,32 +299,41 @@ static void ubug_init_weblist(void)
 	MSLROW	allRow;
 	WEBIN	**pList = &urlSaveList;
 
-	if(mysql_query(&urlDataBase, GET_DIRECTORY) != FUN_RUN_END) {
-		if(ubug_dberr_dispose(&urlDataBase, "ubug_init_weblist - mysql_query - GET_DIRECTORY") != FUN_RUN_OK)
+	if (mysql_query(&urlDataBase, GET_DIRECTORY) != FUN_RUN_END) {
+		if (ubug_dberr(&urlDataBase, "ubug_init_weblist - mysql_query - GET_DIRECTORY") != FUN_RUN_OK)
 			ubug_sig_error();
 	}
 
-	if(!(allRes = mysql_store_result(&urlDataBase))) {
+	if (!(allRes = mysql_store_result(&urlDataBase))) {
 		printf("Urlbug---> ubug_init_weblist - mysql_store_result - no web\n");
 
-		if(ubug_dberr_dispose(&urlDataBase, "ubug_init_weblist - mysql_store_result") != FUN_RUN_OK)
+		if (ubug_dberr(&urlDataBase, "ubug_init_weblist - mysql_store_result") != FUN_RUN_OK)
 			ubug_sig_error();
 	}
 
-	while((allRow = mysql_fetch_row(allRes))) {
-		if((*pList = malloc(sizeof(WEBIN))) == NULL) {
+	while ((allRow = mysql_fetch_row(allRes))) {
+		if ((*pList = malloc(sizeof(WEBIN))) == NULL) {
 			elog_write("ubug_init_weblist - malloc", FUNCTION_STR, ERROR_STR);
 			ubug_sig_error();
 		}
 
 		ubug_init_urllist(allRow[0], &((*pList)->w_ubuf));
 
-		if(allRow[1]) {
+                /* latest time read */
+		if (allRow[1]) {
 			(*pList)->w_latest[strlen(allRow[1])] = 0;
 			strcpy((*pList)->w_latest, allRow[1]);
 		}
 
-		if(!network_get_addr(*pList)) {
+		(*pList)->w_lcnt = 0;
+
+                /* init url store buff */
+                if (!ubug_init_dbuf(&((*pList)->w_buff))) {
+                        elog_write("ubug_init_weblist - ubug_init_dbuf", FUNCTION_STR, ERROR_STR);
+                        ubug_sig_error();
+                }
+
+		if (!network_get_addr(*pList)) {
 			free(*pList);
 			continue;
 		}
@@ -398,12 +392,12 @@ static int network_down_web(WEBIN *wInfo)
 	int	tRead, strRet, sockFd, contOff = 0;
 
 	if((sockFd = socket(AF_INET, SOCK_STREAM, 0)) == FUN_RUN_FAIL) {
-		perror("Urlbug---> network_down_web - socket");
+		ubug_perror("network_down_web - socket", errno);
 		return	FUN_RUN_END;
 	}
 
 	if(socket_set_timer(sockFd, TINY_TIME, 0, SO_SNDTIMEO) == FUN_RUN_FAIL) {
-		perror("Urlbug---> network_down_web - socket_set_timer");
+		ubug_perror("network_down_web - socket_set_timer", errno);
 		close(sockFd);
 		return	FUN_RUN_END;
 	}
@@ -422,7 +416,8 @@ static int network_down_web(WEBIN *wInfo)
 	}
 
 	for(tRead = 0; tRead < UBUG_NREAD; tRead++) {
-		if((strRet = select_read(sockFd, wInfo->w_conbuf + contOff, RECE_DATA, 0, TINY_USEC)) == FUN_RUN_FAIL)
+		if((strRet = select_read(sockFd, wInfo->w_conbuf + contOff, RECE_DATA, 0, 
+		TINY_USEC)) == FUN_RUN_FAIL)
 			break;
 
 		if((strRet >= MEHTML_LEN && strnstr(wInfo->w_conbuf + contOff, MATCH_ENDHTML, strRet)) || 
@@ -445,28 +440,28 @@ static int network_down_web(WEBIN *wInfo)
 /*-----network_send_httpreq-----*/
 static int network_send_httpreq(WEBIN *wInfo, int nSock)
 {
-	char	sqlCom[SQL_SCOM_LEN], urlData[URL_LEN], rwData[RECE_DATA], *pChar, *pEnd;
+	char	sqlCom[SQL_SCOM_LEN], urlStr[URL_LEN], rwData[RECE_DATA], *pChar, *pEnd;
 	int	fRet, httpChk;
 
 	fRet = sprintf(rwData, "GET %s HTTP/1.1\r\nHost: %s\r\n%s",
 			wInfo->w_ubuf.web_file, wInfo->w_ubuf.web_host, rPac);
 
-	sprintf(urlData, "%s%s%s", MATCH_HTTP, wInfo->w_ubuf.web_host, wInfo->w_ubuf.web_file);
+	sprintf(urlStr, "%s%s%s", MATCH_HTTP, wInfo->w_ubuf.web_host, wInfo->w_ubuf.web_file);
 
 	if(write(nSock, rwData, fRet) != fRet) {
-		elog_write("network_send_httpreq - write", urlData, ERROR_STR);
+		elog_write("network_send_httpreq - write", urlStr, ERROR_STR);
 		return	FUN_RUN_END;
 	}
 
 	if((fRet = select_read(nSock, rwData, RECE_DATA, TAKE_A_SEC, TAKE_A_NO)) < FUN_RUN_OK) {
-		elog_write("network_send_httpreq - select_read", urlData, ERROR_STR);
+		elog_write("network_send_httpreq - select_read", urlStr, ERROR_STR);
 		return	FUN_RUN_END;
 	}
 
 	rwData[fRet] = 0;
 
 	if(!(pChar = strstr(rwData, "\r\n\r\n"))) {
-		elog_write("network_send_httpreq - httpret", urlData, "http ret wrong");
+		elog_write("network_send_httpreq - httpret", urlStr, "http ret wrong");
 		return	FUN_RUN_FAIL;
 	}
 
@@ -478,16 +473,19 @@ static int network_send_httpreq(WEBIN *wInfo, int nSock)
 	httpChk = atoi(rwData + 9);
 	if(httpChk != RESP_CONNECT_OK) {
 		sprintf(sqlCom, "%d", httpChk);
-		elog_write("cannot download website", urlData, sqlCom);
+		elog_write("cannot download website", urlStr, sqlCom);
 		return	FUN_RUN_END;
 	}
 
-	if((pChar = strstr(rwData, MATCH_LAMD)))
+	/* move offset "Last-Modified:" or "Date:" */
+	if((pChar = strstr(rwData, MATCH_LAMD))) {
 		pChar += MLAMD_LEN;
 
-	else if((pChar = strstr(rwData, MATCH_DATE)))
+	} else if((pChar = strstr(rwData, MATCH_DATE))) {
 		pChar += MDATE_LEN;
+	}
 
+	/* if there're no "\r\n\r\n" at the end, returing */
 	if(!pChar || (pEnd = strstr(pChar, MATCH_LINKBRK)) == NULL)
 		return	FUN_RUN_FAIL;
 
@@ -497,17 +495,21 @@ static int network_send_httpreq(WEBIN *wInfo, int nSock)
 	}
 
 	if(pChar) {
-		sprintf(sqlCom, UPDATE_LATEST, (int)(pEnd - pChar), pChar, urlData);
+		sprintf(sqlCom, UPDATE_LATEST, (int)(pEnd - pChar), pChar, urlStr);
 
-		while(!mato_dec_and_test(&writeStoreLock))
+		if (++wInfo->w_lcnt == LATEST_UPGRADE_LIMIT) {
+			wInfo->w_lcnt = 0;
+
+			while (!mato_dec_and_test(&writeStoreLock))
+				mato_inc(&writeStoreLock);
+
+			if (mysql_query(&urlDataBase, sqlCom) != FUN_RUN_END) {
+				if (ubug_dberr(&urlDataBase, "send_httpreq - up latest") != FUN_RUN_OK)
+					ubug_sig_error();
+			}
+
 			mato_inc(&writeStoreLock);
-
-		if(mysql_query(&urlDataBase, sqlCom) != FUN_RUN_END) {
-			if(ubug_dberr_dispose(&urlDataBase, "send_httpreq - update latest") != FUN_RUN_OK)
-				ubug_sig_error();
 		}
-
-		mato_inc(&writeStoreLock);
 	}
 
 	return	fRet;
@@ -523,7 +525,7 @@ static int network_get_addr(WEBIN *wInfo)
 
 	while(!(pHost = gethostbyname(wInfo->w_ubuf.web_host))) {
 		if(errno) {
-			perror("Urlbug---> network_get_addr - gethostbyname");
+			ubug_perror("network_get_addr - gethostbyname", errno);
 			return	FUN_RUN_END;
 		}
 	}
@@ -611,8 +613,8 @@ static void ubug_main_entrance(void)
 
 		urlRunSet.ubs_fstf();
 
-		if(initMsgFlags)
-			sp_msgs_frame_run(urlMsgSet, NULL);
+		if(procCommuFd)
+			sp_msg_frame_run(urlMsgSet, NULL);
 
 		sleep(TAKE_A_REST);
 
@@ -648,7 +650,7 @@ static void ubug_text_store_content(WEBIN *stPoint)
 	4. ubug_connect_head
 	5. ubug_find_key_date
 	6. ubug_check_url_prefix
-	7. ubug_reach_str_http
+	7. ubug_reach_url
 
 --------------------------------------------*/
 
@@ -658,7 +660,9 @@ static void ubug_job(WEBIN *wPoint)
 	char	*pHttp, *pBegin, *pSign;
 	int	getLen, hostLen = strlen(wPoint->w_ubuf.web_host);
 
-	for(pHttp = pBegin = wPoint->w_conbuf; pBegin && pBegin < wPoint->w_conbuf + wPoint->w_size; pBegin = pSign) {
+	pHttp = pBegin = wPoint->w_conbuf;
+
+	for(; pBegin && pBegin < wPoint->w_conbuf + wPoint->w_size; pBegin = pSign) {
 		if(!(pHttp = strstr(pBegin, MATCH_HREF)))
 			return;
 
@@ -667,15 +671,15 @@ static void ubug_job(WEBIN *wPoint)
 		if(!(pSign = strchr(pHttp, '"')))
 			return;
 
-		if(!(pHttp = ubug_reach_str_http(pHttp, pSign)))
-			continue;
-
-		if((getLen = pSign - pHttp) >= WEBFILE_LEN)
-			continue;
-
 		if(!strncmp(pSign - MHTML_LEN, MATCH_HTML, MHTML_LEN) ||
 		   !strncmp(pSign - MSHTML_LEN, MATCH_SHTML, MSHTML_LEN) ||
 		   !strncmp(pSign - MHTM_LEN, MATCH_HTM, MHTM_LEN)) {
+			if(!(pHttp = ubug_reach_url(pHttp, pSign)))
+				continue;
+
+			if((getLen = pSign - pHttp) >= urlMaxLen)
+				continue;
+
 			if(!ubug_find_key_date(pHttp, getLen))
 				continue;
 
@@ -686,11 +690,11 @@ static void ubug_job(WEBIN *wPoint)
 					continue;
 			}
 
-			if(ubug_check_url_prefix(pHttp) || 
-			(urlRunSet.ubs_chk && (urlRunSet.ubs_chk(pHttp, getLen) == FUN_RUN_OK)))
+			if((urlRunSet.ubs_chk && (urlRunSet.ubs_chk(pHttp, getLen) == FUN_RUN_OK)) ||
+                            ubug_check_url_prefix(pHttp))
 				continue;
 
-			urlRunSet.ubs_fst(pHttp, getLen, wPoint->w_pattern);
+			urlRunSet.ubs_fst(wPoint, pHttp, getLen);
 			nCatchNum++;
 		}
 	}
@@ -793,8 +797,8 @@ static int ubug_check_url_prefix(char *preSrc)
 }
 
 
-/*-----ubug_reach_str_http-----*/
-static char *ubug_reach_str_http(char *pSrc, char *pLimit)
+/*-----ubug_reach_url-----*/
+static char *ubug_reach_url(char *pSrc, char *pLimit)
 {
 	for(; pSrc < pLimit; pSrc++) {
 		if(isalnum(*pSrc) || *pSrc == '/' || *pSrc == '.')
@@ -825,16 +829,17 @@ void ubug_time_change(void)
 
 
 /*-----ubug_send_message-----*/
-int ubug_send_message(int nSock)
+int ubug_send_message(int msgFd)
 {
-	SOCKMG	sendMsg;
+	PMSG	sendMsg;
 
 	if(nCatchNum) {
-		sp_msgs_fill(sendMsg, PART_URLBUG, PART_TEXTBUG, KEEP_WORKING);
+		memset(&sendMsg, 0, MSG_LEN);
+		sp_msg_fill_stru(&sendMsg, PART_TEXTBUG, KEEP_WORKING);
 
-		if(!sp_msgs_send(nSock, &sendMsg, sizeof(SOCKMG))) {
-			elog_write("ubug_send_message - sp_msgs_send", FUNCTION_STR, ERROR_STR);
-			return	FUN_RUN_END;
+		if(sp_msg_write(msgFd, &sendMsg) == FUN_RUN_FAIL) {
+			elog_write("ubug_send_message - sp_msg_write", FUNCTION_STR, ERROR_STR);
+			return	FUN_RUN_FAIL;
 		}
 	}
 

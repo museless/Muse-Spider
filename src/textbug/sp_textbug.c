@@ -1,28 +1,3 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 /*------------------------------------------
 	Source file content Twelve part
 
@@ -52,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #include "spmsg.h"
 #include "spmpool.h"
 #include "sphtml.h"
+#include "spsock.h"
 #include "spframe.h"
 
 #include "mmdpool.h"
@@ -189,7 +165,7 @@ static void txbug_command_analyst(int nPara, char **pComm)
 {
 	int	nCir, tFlags, hFlags, cOff;
 
-	initMsgFlags = tFlags = hFlags = 0;
+	tFlags = hFlags = 0;
 
 	for(cOff = -1, nCir = 1; nCir < nPara; nCir++) {
 		if(!strcmp(pComm[nCir], "--help") || !strcmp(pComm[nCir], "-h")) {
@@ -203,8 +179,8 @@ static void txbug_command_analyst(int nPara, char **pComm)
 			txbug_run_set(module_database_init, txbug_tran_db, (fwtf)txbug_tran_db_force, 
 				(fwtr)txbug_tran_db_news, txbug_create_nv, &txTranHand.tx_sql);
 
-		} else if(!strcmp(pComm[nCir], "-l") || !strcmp(pComm[nCir], "--link")) {
-			initMsgFlags = 1;
+		} else if(!strcmp(pComm[nCir], "-f")) {
+			textProcFd = atoi(pComm[++nCir]);
 
 		} else if(!strcmp(pComm[nCir], "-t")) {
 			txbug_timbuf_init(pComm[++nCir]); tFlags = 1;
@@ -255,7 +231,7 @@ static void txbug_command_analyst(int nPara, char **pComm)
 /*-----mainly_init-----*/
 static int mainly_init(void)
 {
-	if(!sp_normal_init("Textbug", &textGarCol, (SOSET **)&txbugMsgSet, txbug_msg_init, "textbug_err_log", initMsgFlags))
+	if(!sp_normal_init("Textbug", &textGarCol, (MSGSET **)&txbugMsgSet, txbug_msg_init, "textbug_err_log", textProcFd))
 		return	FUN_RUN_END;
 
 	/* mgc one init */
@@ -669,31 +645,25 @@ static void txbug_main(void)
 	MSLROW	uRow;
 	TEXT	*pText;
 	WEB	webStru;
-	short	nLimit, funRet, tSync = cSyncTime;
+	short	nLimit, nRet, tSync = cSyncTime;
 
 	sprintf(selectSqlComm, GET_URL_LIMIT, urlsTblName, nToleError, newsDbName, newsTblName, nLoadLimit);
 
 	while(FUN_RUN_OK) {
-		uResult = txbug_sql_download();
-
-		if(initMsgFlags) {
-			funRet = sp_msgs_frame_run(txbugMsgSet, uResult);
-
-			if(funRet == FUN_RUN_FAIL || funRet == FUN_RUN_END) {
-				sleep(TAKE_A_NOTHING);
-				continue;
-			}
-		}
-
-		if(!uResult) {
-			sleep(TAKE_A_NOTHING);
+		if(!(uResult = txbug_sql_download()))
 			continue;
-		}
 
 		mgc_one_add(&txbugResCol, uResult);
 
 		/* tSync used to force the buffer's data tran to I/O */
 		txbug_data_sync(tSync);
+
+		if(textProcFd) {
+			if(sp_msg_frame_run(txbugMsgSet, uResult) == FUN_RUN_FAIL) {
+				sleep(TAKE_A_NOTHING);
+				continue;
+			}
+		}
 
 		for(nLimit = 0; (uRow = mysql_fetch_row(uResult)); ) {
 			if(nLimit++ == nTxbugPthread) {
@@ -710,7 +680,7 @@ static void txbug_main(void)
 				pText->wt_pattern = atoi(uRow[2]);
 				memset(pText->wt_charset, 0, CHARSET_LEN);
 
-				if((funRet = txbug_web_download(&webStru, pText)) == FUN_RUN_OK) {
+				if((nRet = txbug_web_download(&webStru, pText)) == FUN_RUN_OK) {
 					txbug_txbug_charset_set(pText);
 					txbug_pthread_generator(pText);
 					continue;
@@ -718,7 +688,7 @@ static void txbug_main(void)
 
 				txbug_pool_free(pText);
 
-				(funRet == FUN_RUN_FAIL) ?
+				(nRet == FUN_RUN_FAIL) ?
 				txbug_db_rewind_state(WGURL_STATE, uRow[0]) :
 				txbug_db_rewind_state(INC_ERRT, uRow[0]);
 			}
@@ -1125,7 +1095,7 @@ static inline int txbug_check_contxbug_end(char *contEnd)
 /*-----txbug_keep_working-----*/
 void txbug_keep_working(void *pResult)
 {
-	if(pResult && !mysql_num_rows((MSLRES *)pResult))
+	if(!mysql_num_rows((MSLRES *)pResult))
 		sleep(TAKE_A_EYECLOSE);
 }
 
@@ -1137,7 +1107,7 @@ void txbug_time_change(void)
 
 	textbugRunSet.ts_wtf(&txTranHand.tx_sql, &writeDataLock, contStoreBuf);
 
-	txbug_wait_arouse(txbugMsgSet);
+	txbug_wait_arouse(sp_msg_frame_fd(txbugMsgSet), TAKE_A_REST);
 	txbug_timbuf_init(NULL);
 	textbugRunSet.ts_fctim();
 	sprintf(selectSqlComm, GET_URL_LIMIT, urlsTblName, nToleError, newsDbName, newsTblName, nLoadLimit);
@@ -1147,15 +1117,16 @@ void txbug_time_change(void)
 
 
 /*-----txbug_send_message-----*/
-int txbug_send_message(int nSock)
+int txbug_send_message(int msgFd)
 {
-	SOCKMG	sendMsg;
+	PMSG	sendMsg;
 
-	sp_msgs_fill(sendMsg, PART_TEXTBUG, PART_EXTBUG, KEEP_WORKING);
+	memset(&sendMsg, 0, MSG_LEN);
+	sp_msg_fill_stru(&sendMsg, PART_EXTBUG, KEEP_WORKING);
 
-	if(!sp_msgs_send(nSock, &sendMsg, sizeof(SOCKMG))) {
-		elog_write("txbug_send_message - sp_msgs_send", FUNCTION_STR, ERROR_STR);
-		return	FUN_RUN_END;
+	if(sp_msg_write(msgFd, &sendMsg) == FUN_RUN_FAIL) {
+		elog_write("txbug_send_message - sp_msg_write", FUNCTION_STR, ERROR_STR);
+		return	FUN_RUN_FAIL;
 	}
 
 	return	FUN_RUN_OK;

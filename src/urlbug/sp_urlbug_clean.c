@@ -1,61 +1,18 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
-/*------------------------------------------
-	Source file content Five part
-
-	Part Zero:	Include
-	Part One:	Define
-	Part Two:	Global data
-	Part Three:	Local function
-
-	Part Four:	Cleaning function
-
---------------------------------------------*/
-
-/*------------------------------------------
-	Part Zero: Include
---------------------------------------------*/
-
 #include "spinc.h"
 #include "spmpool.h"
 #include "spnet.h"
+#include "spsock.h"
 #include "spdb.h"
 #include "spmsg.h"
 #include "spuglobal.h"
 
 
-/*------------------------------------------
-	Part One: Global data
---------------------------------------------*/
-
+/* global data */
 BUFF	*urlBufStu;
 WEBIN	*urlSaveList;
 WPOOL	*contStorePool, *urlStorePool;
 MGCH	*urlGarCol;
-SOSET	*urlMsgSet;
+MSGSET	*urlMsgSet;
 
 void	*ubugThreadPool;/* PTHPOOL */
 
@@ -76,7 +33,7 @@ FBSTR	forbitStrList[] = {{"ad", 2}, {"blog", 4}, {"video", 5}, {"bbs", 3}, {"fas
 			   {"travel", 6}, {"bschool", 7}, {"shoucang", 8}, {"pxpt", 4}, {"auto", 4}, {"tv", 2},
 			   {"vhouse", 6}, {"book", 4}, {"bj", 2}, {"photo", 5}, {"lady", 4}, {"kb", 2}, {"pic", 3}};
 
-int	initMsgFlags, nRunPthread;
+int	procCommuFd, nRunPthread, urlMaxLen;
 MATOS	writeStoreLock;
 
 int	nFbWord = sizeof(forbitStrList) / sizeof(forbitStrList[0]);
@@ -84,7 +41,7 @@ int	webPattNum = sizeof(perWebPatt) / sizeof(perWebPatt[0]);
 
 
 /*------------------------------------------
-	Part Four: Cleaning function
+	Part Zero: Cleaning function
 
 	1. ubug_free_weblist
 	2. ubug_db_clean

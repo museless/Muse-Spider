@@ -2,7 +2,7 @@
 CC	= gcc
 NMFLAGS = -g -Wall -I include/
 OTFLAGS = -I ../include/ -I ../include/inclib -I ../include/inclib/musealgo
-MSFLAGS	= -I /usr/local/mysql/include/mysql -L /usr/local/mysql/lib/mysql -lmysqlclient
+MSFLAGS	= -I /usr/local/include/mysql -L /usr/local/lib/mysql -lmysqlclient
 PTFLAGS = -rdynamic -pthread -lz -lcrypt -lnsl -lm
 
 # Exf
@@ -24,6 +24,7 @@ SRCFORM	= src/sp_format.c ../src/flib/sp_global.c ../src/flib/sp_pfun.c
 # phony
 .PHONY : tool gath form rm
 
+all	: tool gath form rm
 tool	: $(EXTOOL)
 rm	: $(EXRM)
 gath	: $(EXGA)

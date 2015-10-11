@@ -6,7 +6,7 @@ urls_db_name		= Url
 
 # about paths
 urls_save_path		= /MuseSp/text/history
-conts_save_path		= /MuseSp/text/content
+conts_save_path		= /MuseSp/text/cont
 
 confs_save_path		= /MuseSp/tool/text
 

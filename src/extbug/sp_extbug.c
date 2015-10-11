@@ -1,28 +1,3 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 /*------------------------------------------
 	Source file content Eleven part
 
@@ -51,8 +26,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #include "spmpool.h"
 #include "spdict.h"
 #include "spframe.h"
-
-#include <sys/wait.h>
 
 #include "mmdpool.h"
 #include "mmdperr.h"
@@ -91,7 +64,6 @@ static	int	exbug_dictionary_load(char *fConf, char *savConf, char *fName, CLISTS
 static	int	exbug_findex_load(char *finPath);
 static	int	exbug_index_load(WHEAD **cStru, char *iName, int nTerms);
 static	int	exbug_terms_load(WDCB **termStru, char *termFile, int nOff);
-static	int	exbug_flesh_dictionary(void);
 /*
 static	int	exbug_ttimes_load(WDCB *cbStru, int nOff);
 */
@@ -158,7 +130,7 @@ static void exbug_command_analyst(int nPara, char **paraList)
 {
 	int	nCir, cOff, hFlags, tFlags;
 
-	initMsgFlags = hFlags = tFlags = 0;
+	hFlags = tFlags = 0;
 
 	for(cOff = -1, nCir = 1; nCir < nPara; nCir++) {
 		if(!strcmp(paraList[nCir], "--help") || !strcmp(paraList[nCir], "-h")) {
@@ -178,8 +150,8 @@ static void exbug_command_analyst(int nPara, char **paraList)
 			exbug_runset_init(exbug_keyword_job, exbug_train_init, NULL,
 			NULL, NULL, NULL, exbug_extract_practise, NULL, MASK_PRA);
 
-		} else if(!strcmp(paraList[nCir], "-l") || !strcmp(paraList[nCir], "--link")) {
-			initMsgFlags = 1;
+		} else if(!strcmp(paraList[nCir], "-f")) {
+			exbugIpcFd = atoi(paraList[++nCir]);
 
 		} else {
 			printf("Extbug---> wrong command: %s\n \
@@ -229,7 +201,7 @@ static int mainly_init(void)
 {
 	char	strPath[PATH_LEN];
 
-	if(!sp_normal_init("Extbug", &exbGarCol, (SOSET **)&extbugMsgSet, exbug_msg_init, "extbug_err_locate", initMsgFlags))
+	if(!sp_normal_init("Extbug", &exbGarCol, (MSGSET **)&extbugMsgSet, exbug_msg_init, "extbug_err_locate", exbugIpcFd))
 		return	FUN_RUN_END;
 
 	/* mgc one init */
@@ -363,7 +335,6 @@ static int exbug_train_init(void)
 	3. exbug_index_load
 	4. exbug_terms_load
 	5. exbug_ttimes_load
-	6. exbug_flesh_dictionary
 
 --------------------------------------------*/
 
@@ -375,11 +346,6 @@ static int exbug_dictionary_load(char *fConf, char *savConf, char *fName, CLISTS
 	char	nameBuf[PATH_LEN];
 	char	dicPath[PATH_LEN];
 	int	nCnt;
-
-	if(exbug_flesh_dictionary()) {
-		exbug_perror("exbug_dictionary_load - exbug_flesh_dictionary", errno);
-		return	FUN_RUN_FAIL;
-	}
 
 	if(mc_conf_read(fConf, CONF_STR, dicPath, PATH_LEN) == FUN_RUN_FAIL) {
 		mc_conf_print_err(fConf);
@@ -507,40 +473,6 @@ static int exbug_terms_load(WDCB **termStru, char *termFile, int nOff)
 }
 
 
-/*-----exbug_flesh_dictionary-----*/
-static int exbug_flesh_dictionary(void)
-{
-	char	scriPath[PATH_LEN];
-	pid_t	chPid;
-
-	if(mc_conf_read("extbug_mkdic_scri_loca", CONF_STR, scriPath, PATH_LEN) == FUN_RUN_FAIL) {
-		mc_conf_print_err("extbug_mkdic_scri_loca");
-		errno = EINVAL;
-		return	FUN_RUN_FAIL;
-	}
-
-	if((chPid = vfork()) == FUN_RET_NEG) {
-		return	FUN_RUN_FAIL;
-
-	} else if(chPid == 0) {
-		if(!chmod(scriPath, SCRIPT_AUTHOR)) {
-			execl(scriPath, scriPath, NULL);
-			exbug_perror("exbug_flesh_dictionary - execl", errno);
-
-		} else {
-			exbug_perror("exbug_flesh_dictionary - chmod", errno);
-		}
-
-		exit(FUN_RET_NEG);
-	}
-
-	if(waitpid(chPid, NULL, 0) == FUN_RET_NEG)
-		return	FUN_RUN_FAIL;
-
-	return	FUN_RUN_END;
-}
-
-
 /*-----exbug_ttimes_load-----*/
 /*static int exbug_ttimes_load(WDCB *cbStru, int nOff)
 {
@@ -595,23 +527,18 @@ static void exbug_keyword_job(void)
 	MSLRES	*newsRes;
 	MSLROW	newsRow;
 	NCONT	*pContent;
-	int	nRet;
 
 	while(FUN_RUN_OK) {
-		newsRes = exbug_content_download();
+		if(!(newsRes = exbug_content_download())) {
+			sleep(TAKE_A_EYECLOSE);
+			continue;
+		}
 
-		if(initMsgFlags) {
-			nRet = sp_msgs_frame_run(extbugMsgSet, newsRes);
-
-			if(nRet == FUN_RUN_FAIL || nRet == FUN_RUN_END) {
+		if(exbugIpcFd) {
+			if(sp_msg_frame_run(extbugMsgSet, newsRes) == FUN_RUN_FAIL) {
 				sleep(TAKE_A_NOTHING);
 				continue;
 			}
-		}
-
-		if(!newsRes) {
-			sleep(TAKE_A_EYECLOSE);
-			continue;
 		}
 
 		mgc_one_add(&extResCol, newsRes);
@@ -685,12 +612,11 @@ void exbug_time_change(void)
 	if(exbRunSet.emod_fwrt)
 		exbRunSet.emod_fwrt();
 
+	exbug_wait_arouse(sp_msg_frame_fd(extbugMsgSet), TAKE_A_REST);
 	exbug_timbuf_init(NULL);
 
 	if(exbRunSet.emod_tchange)
 		exbRunSet.emod_tchange();
-
-	exbug_wait_arouse(extbugMsgSet);
 
 	return;
 }
@@ -699,24 +625,8 @@ void exbug_time_change(void)
 /*-----exbug_keep_working-----*/
 void exbug_keep_working(void *pResult)
 {
-	if(pResult && !mysql_num_rows((MSLRES *)pResult))
+	if(!mysql_num_rows((MSLRES *)pResult))
 		sleep(TAKE_A_EYECLOSE);
-}
-
-
-/*-----exbug_send_message-----*/
-int exbug_send_message(int nSock)
-{
-	SOCKMG	sendMsg;
-
-	sp_msgs_fill(sendMsg, PART_EXTBUG, PART_OUTBUG, KEEP_WORKING);
-
-	if(!sp_msgs_send(nSock, &sendMsg, sizeof(SOCKMG))) {
-		elog_write("exbug_send_message - sp_msgs_send", FUNCTION_STR, ERROR_STR);
-		return	FUN_RUN_END;
-	}
-
-	return	FUN_RUN_OK;
 }
 
 

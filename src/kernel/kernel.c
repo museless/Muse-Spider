@@ -1,30 +1,5 @@
-/* Copyright (c) 2015, William Muse
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
-
 /*------------------------------------------
-	Source file content Ten part
+	Source file content Eleven part
 
 	Part Zero:	Include
 	Part One:	Local data
@@ -34,9 +9,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 	Part Four:	Kernel main
 	Part Five:	Kernel Initialization
 	Part Six:	Kernel signal handle
-	Part Seven:	Time change part
-	Part Eight:	Process control
-	Part Ten:	Error handler
+	Part Seven:	Exec part
+	Part Eight:	PLC control
+	Part Nine:	Time change part
+	Part Ten:	Help
 
 --------------------------------------------*/
 
@@ -47,10 +23,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 #include "spinc.h"
 #include "spmsg.h"
-
-#include "mmdpool.h"
 #include "mgc.h"
-
+#include <strings.h>
+#include <sys/select.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 
@@ -60,26 +35,25 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 --------------------------------------------*/
 
 /* typedef */
-typedef	struct	partlist	PARTL;
+typedef	void	(*kn_exec)(char *fdStr);
 
-typedef	int	(*ktcf)(void);
+typedef	struct	partlist	PARTL;
 
 /* struct */
 struct	partlist {
+	kn_exec	p_exec;
+
 	int	p_fd;
 	int	p_pid;
 	PMSG	p_mstru;
 
 	int	p_flags;
-	int	p_cmode;
 };
 
-/* local data */
+/* data */
+static	PARTL	mPartList[PART_MAX];
 static	MGCH	*kernGarCol;
-static	DMPH	*kernMemPool;
-static	SOCKSV	*kernSockServ;
 static	char	dateSaveBuf[SMALL_BUF];
-static	char	minSaveBuf[SMALL_BUF];
 
 
 /*------------------------------------------
@@ -90,31 +64,40 @@ static	char	minSaveBuf[SMALL_BUF];
 static	void	kern_main(void);
 
 /* Part Five */
-static	int	kern_data_init(void);
-static	int	kern_base_init(void);
-static	int	kern_signal_init(void);
+static	void	kern_data_init(void);
+static	void	kern_init(int nPara, char **agBuf);
+static	void	kern_base_init(void);
+static	void	kern_signal_init(void);
+static	void	kern_child_init(int iPart, int nFlags, kn_exec pExec);
 
 /* Part Six */
 static	void	kern_sigdeal_entrance(int nSignal);
 
 /* Part Seven */
-static	void	kern_time_check_init(void);
-static	void	kern_time_checking(ktcf ctFun);
-static	int	kern_time_switch_check(void);
-static	int	kern_time_call_check(void);
+static	void	kern_exec_urlbug(char *fdStr);
+static	void	kern_exec_textbug(char *fdStr);
+static	void	kern_exec_extbug(char *fdStr);
+static	void	kern_exec_outbug(char *fdStr);
 
 /* Part Eight */
-static	void	kern_remove_socket(SOCKSV *pServ, SOCKPC *pForward, SOCKPC *pRemove);
+static	void	kern_part_add(int nId, int nPid, int nFlags, int nPipe);
+static	void	kern_part_cut(PARTL *cutPart);
 
 /* Part Nine */
-static	void	kern_perror(char *errStr, int nError);
+static	void	kern_ctime_init(void);
+static	void	kern_ctime_part(void);
+
+/* Part Ten */
+static	void	kern_print_help(void);
 
 
 /*------------------------------------------
 	Part Three: Define
 --------------------------------------------*/
 
-#define	SELECT_TIME	0x8
+#define	FD_MAX		PART_MAX
+
+#define	SELECT_WTIME	0x8
 
 
 /*------------------------------------------
@@ -128,14 +111,13 @@ static	void	kern_perror(char *errStr, int nError);
 /*-----main-----*/
 int main(int argc, char *argv[])
 {
-	if(kern_base_init() && kern_data_init()) {
-		if(kern_signal_init())
-			kern_main();
-	}
+	kern_data_init();
+	kern_base_init();
+	kern_signal_init();
 
-	printf("Kernel---> unexpected exit\n");
+	kern_init(argc, argv);
 
-	mgc_all_clean(kernGarCol);
+	kern_main();
 
 	return	FUN_RUN_END;
 }
@@ -144,63 +126,57 @@ int main(int argc, char *argv[])
 /*-----kern_main-----*/
 static void kern_main(void)
 {
-	SOCKPC	*peerCtl, *recvPeer;
-	TMVAL	seleTime;
-	SOCKMG	soMsg;
-	fd_set	readSet;
-	int	maxSock, nSend;
+	struct	timeval	seleTime;
+	PARTL		*pTable;
+	PMSG		readMsg;
+	fd_set		kFds;
 
-	FD_ZERO(&readSet);
-	kern_time_check_init();
+	FD_ZERO(&kFds);
+	kern_ctime_init();
 
 	while(FUN_RUN_OK) {
-		kern_time_checking(kern_time_call_check);
-		kern_time_checking(kern_time_switch_check);
+		kern_ctime_part();
 
-		/* setting maxsock and fdset */
-		FD_SET(kernSockServ->sv_sock, &readSet);
-		maxSock = sp_msgs_set_fdset(kernSockServ, &readSet);
-		maxSock = ((!maxSock) ? kernSockServ->sv_sock : maxSock) + 1;
+		for(pTable = mPartList; pTable < mPartList + FD_MAX; pTable++) {
+			if(pTable->p_flags & PART_INITED)
+				FD_SET(pTable->p_fd, &kFds);
+		}
 
-		seleTime.tv_sec = SELECT_TIME;
+		seleTime.tv_sec = SELECT_WTIME;
 		seleTime.tv_usec = 0;
 
-		if(select(maxSock, &readSet, NULL, NULL, &seleTime) < FUN_RUN_OK)
+		if(select(FD_MAX, &kFds, NULL, NULL, &seleTime) < FUN_RUN_OK) {
+			sleep(TAKE_A_REST);
 			continue;
+		}
 
-		for(nSend = 0, peerCtl = kernSockServ->sv_plist; peerCtl; peerCtl = peerCtl->sp_next) {
-			if(FD_ISSET(peerCtl->sp_sock, &readSet)) {
-				if(!sp_msgs_recv(peerCtl->sp_sock, &soMsg, sizeof(SOCKMG)))
-					continue;
+		for(pTable = mPartList; pTable < mPartList + FD_MAX; pTable++) {
+			if((pTable->p_flags & PART_INITED) && FD_ISSET(pTable->p_fd, &kFds)) {
+				if(sp_msg_read(pTable->p_fd, &readMsg) == FUN_RUN_FAIL) {
+					elog_write("kern_main - sp_msg_read", FUNCTION_STR, ERROR_STR);
+					if(errno == ECONNRESET)
+						kern_part_cut(pTable);
 
-				if(peerCtl->sp_info.s_own != soMsg.sm_send) {
-					printf("Kernel---> own: %d - msgown: %d\n", peerCtl->sp_info.s_own, soMsg.sm_send);
 					continue;
 				}
 
-				if(!(recvPeer = sp_msgs_peer_existed(kernSockServ, soMsg.sm_recv)))
+				if(sp_msg_recver_exist(&readMsg) && 
+				   (mPartList[sp_msg_recver(&readMsg)].p_flags & PART_INITED))
+					sp_msg_take_comm(&mPartList[sp_msg_recver(&readMsg)].p_mstru, &readMsg);
+			}
+		}
+
+		for(pTable = mPartList; pTable < mPartList + PART_MAX; pTable++) {
+			if((pTable->p_flags & PART_INITED) && sp_msg_command(&pTable->p_mstru)) {
+				if(writen(pTable->p_fd, &pTable->p_mstru, sizeof(PMSG)) == FUN_RUN_FAIL) {
+					if(errno == EPIPE)
+						pTable->p_flags ^= PART_INITED;
+
+					elog_write("kern_main - writen", FUNCTION_STR, ERROR_STR);
 					continue;
-
-				recvPeer->sp_savmsg |= soMsg.sm_comm;
-				nSend++;
-			}
-		}
-
-		if(FD_ISSET(kernSockServ->sv_sock, &readSet)) {
-			if(!sp_msgs_accept_and_test(kernSockServ)) {
-				if(errno == ENOMEM)
-					printf("Kernel---> kernel source out!!!\n");
-			}
-		}
-
-		if(nSend) {
-			for(peerCtl = kernSockServ->sv_plist; peerCtl; peerCtl = peerCtl->sp_next) {
-				if(peerCtl->sp_savmsg != NO_MSG) {
-					sp_msgs_fill(soMsg, PART_KERNEL, peerCtl->sp_info.s_own, peerCtl->sp_savmsg);
-
-					sp_msgs_send(peerCtl->sp_sock, &soMsg, sizeof(SOCKMG));
-					peerCtl->sp_savmsg = NO_MSG;
 				}
+
+				sp_msg_unfill_comm(&pTable->p_mstru);
 			}
 		}
 	}
@@ -210,66 +186,94 @@ static void kern_main(void)
 /*------------------------------------------
 	Part Five: Kernel Initialization
 
-	1. kern_base_init
-	2. kern_data_init
+	1. kern_data_init
+	1. kern_init
+	2. kern_base_init
 	3. kern_signal_init
+	4. kern_child_init
 
 --------------------------------------------*/
 
-/*-----kern_base_init-----*/
-static int kern_base_init(void)
+/*-----kern_data_init-----*/
+static void kern_data_init(void)
 {
-	if(!(kernGarCol = mgc_init())) {
-		kern_perror("kern_base_init - mgc_init", errno);
-		return	FUN_RUN_END;
+	int	nCir;
+
+	for(nCir = 0; nCir < PART_MAX; nCir++)
+		mPartList[nCir].p_flags = PART_UNINIT;
+}
+
+
+/*-----kern_init-----*/
+static void kern_init(int nPara, char **agBuf)
+{
+	int	nCir;
+
+	bzero(mPartList, PART_MAX * sizeof(PARTL));
+
+	for(nCir = 1; nCir < nPara; nCir++) {
+		if(!strcmp(agBuf[nCir], "-u") || !strcmp(agBuf[nCir], "--urlbug")) {
+			mPartList[PART_URLBUG].p_flags = PART_INITED;
+			mPartList[PART_URLBUG].p_exec = kern_exec_urlbug;
+
+		} else if(!strcmp(agBuf[nCir], "-t") || !strcmp(agBuf[nCir], "--textbug")) {
+			mPartList[PART_TEXTBUG].p_flags = PART_INITED;
+			mPartList[PART_TEXTBUG].p_exec = kern_exec_textbug;
+			
+		} else if(!strcmp(agBuf[nCir], "-e") || !strcmp(agBuf[nCir], "--extbug")) {
+			mPartList[PART_EXTBUG].p_flags = PART_INITED;
+			mPartList[PART_EXTBUG].p_exec = kern_exec_extbug;
+
+		} else if(!strcmp(agBuf[nCir], "-o") || !strcmp(agBuf[nCir], "--outbug")) {
+			mPartList[PART_OUTBUG].p_flags = PART_INITED;
+			mPartList[PART_OUTBUG].p_exec = kern_exec_outbug;
+
+		} else {
+			kern_print_help();
+			exit(FUN_RUN_FAIL);
+		}
+	}
+
+	if(nCir == 1) {
+		printf("---> kernel dos not have the other part - exit\n");
+		kern_print_help();
+		exit(FUN_RUN_FAIL);
+	}
+
+	for(nCir = 0; nCir < PART_MAX; nCir++) {
+		if(mPartList[nCir].p_flags == PART_INITED)
+			kern_child_init(nCir, PART_IC, mPartList[nCir].p_exec);
+	}
+
+	sleep(TAKE_A_EYECLOSE);
+}
+
+
+/*-----kern_base_init-----*/
+static void kern_base_init(void)
+{
+	if((kernGarCol = mgc_init()) == NULL) {
+		printf("Kernel---> kern_base_init - mgc_init - no memery to alloc kernGarCol\n");
+		exit(FUN_RUN_FAIL);
 	}
 
 	mc_conf_load("Kernel", "/MuseSp/conf/kernel.cnf");
 
 	if(mgc_add(kernGarCol, NULL_POINT, (gcfun)mc_conf_unload) == MGC_FAILED)
-		kern_perror("kern_base_init - mgc_add - garcol", errno);
+		perror("Kernel---> kern_base_init - mgc_add - kernGarCol");
 
 	elog_init("kernel_err_log");
 
 	if(mgc_add(kernGarCol, NULL_POINT, (gcfun)elog_destroy) == MGC_FAILED)
-		kern_perror("kern_base_init - mgc_add - elog", errno);
-
-	return	FUN_RUN_OK;
-}
-
-
-/*-----kern_data_init-----*/
-static int kern_data_init(void)
-{
-	int	mpSize;
-
-	if(mc_conf_read("kernel_mpool_size", CONF_NUM, &mpSize, sizeof(int)) == FUN_RUN_FAIL) {
-		mc_conf_print_err("kernel_mpool_size");
-		return	FUN_RUN_END;
-	}
-
-	if(!(kernMemPool = mmdp_create(mpSize))) {
-		elog_write("kern_data_init - sp_msg_write", FUNCTION_STR, ERROR_STR);
-		return	FUN_RUN_END;
-	}
-
-	if(mgc_add(kernGarCol, kernMemPool, (gcfun)mmdp_free_all) == MGC_FAILED)
-		kern_perror("kern_data_init - mgc_add - mempool", errno);
-
-	if(!(kernSockServ = sp_msgs_serv_init(SOCK_IP, SOCK_PORT, SOCK_BACKLOG, (mafun)mmdp_malloc, kernMemPool, NULL))) {
-		elog_write("kern_data_init - sp_msgs_serv_init", FUNCTION_STR, ERROR_STR);
-		return	FUN_RUN_END; 
-	}
-
-	return	FUN_RUN_OK;
+		elog_write("kern_base_init - mgc_add", "kern_error_log", ERROR_STR);
 }
 
 
 /*-----kern_signal_init-----*/
-static int kern_signal_init(void)
+static void kern_signal_init(void)
 {
-	SIGAC	sigStru;
-	SIGSET	sigSet;
+	struct	sigaction	sigStru;
+	sigset_t		sigSet;
 
 	/* SIGINT */
 	sigfillset(&sigSet);
@@ -279,8 +283,8 @@ static int kern_signal_init(void)
 	sigStru.sa_mask = sigSet;
 
 	if(sigaction(SIGINT, &sigStru, NULL) == FUN_RUN_FAIL) {
-		kern_perror("kern_signal_init - sigaction - SIGINT", errno);
-		return	FUN_RUN_END;
+		perror("Kernel---> kern_signal_init - sigaction - SIGINT");
+		exit(FUN_RUN_FAIL);
 	}
 
 	/* SIGPIPE */
@@ -291,11 +295,36 @@ static int kern_signal_init(void)
 	sigStru.sa_mask = sigSet;
 
 	if(sigaction(SIGPIPE, &sigStru, NULL) == FUN_RUN_FAIL) {
-		kern_perror("kern_signal_init - sigaction - SIGPIPE", errno);
-		return	FUN_RUN_END;
+		perror("Kernel---> kern_signal_init - sigaction - SIGPIPE");
+		exit(FUN_RUN_FAIL);
+	}
+}
+
+
+/*-----kern_child_init-----*/
+static void kern_child_init(int iPart, int nFlags, kn_exec pExec)
+{
+	int	chPid, sockBuf[2];
+	char	fdBuf[8];
+
+	if(socketpair(AF_LOCAL, SOCK_STREAM, 0, sockBuf) == FUN_RUN_FAIL) {
+		perror("Kernel---> kernel - kern_child_init - socketpair");
+		exit(FUN_RUN_FAIL);
 	}
 
-	return	FUN_RUN_OK;
+	if((chPid = fork()) == FUN_RUN_FAIL) {
+		perror("Kernel---> kernel - kern_child_init - fork");
+		exit(FUN_RUN_FAIL);
+	
+	} else if(chPid == 0) {
+		close(sockBuf[0]);
+		sprintf(fdBuf, "%d", sockBuf[1]);
+
+		pExec(fdBuf);
+	}
+
+	kern_part_add(iPart, chPid, nFlags, sockBuf[0]);
+	close(sockBuf[1]);
 }
 
 
@@ -311,8 +340,7 @@ static void kern_sigdeal_entrance(int nSignal)
 {
 	if(nSignal == SIGINT) {
 		printf("Kernel---> quitting...\n");
-
-		sp_msgs_sendsig_all(kernSockServ, SIGINT);
+		sleep(TAKE_A_SHNAP);
 
 		mgc_all_clean(kernGarCol);
 		exit(FUN_RUN_FAIL);
@@ -325,121 +353,178 @@ static void kern_sigdeal_entrance(int nSignal)
 
 
 /*------------------------------------------
-	Part Seven: Time change part
+	Part Seven: Exec part
 
-	1. kern_time_check_init
-	2. kern_time_checking
-	3. kern_time_switch_check
-	4. kern_time_call_check
+	1. kern_exec_urlbug
+	2. kern_exec_textbug
+	3. kern_exec_extbug
 
 --------------------------------------------*/
 
-/*-----kern_time_check_init-----*/
-static void kern_time_check_init(void)
+/*-----kern_exec_urlbug-----*/
+static void kern_exec_urlbug(char *fdStr)
 {
-	TMS	*tStru;
-	time_t	timSec;
+	char	ubugPath[PATH_LEN];
+
+	if(mc_conf_read("urlbug_exec_locate", CONF_STR, ubugPath, PATH_LEN) == FUN_RUN_FAIL) {
+		mc_conf_print_err("urlbug_exec_locate");
+		exit(FUN_RUN_FAIL);
+	}
+
+	if(execl(ubugPath, ubugPath, "--write_db", "-f", fdStr, NULL) == FUN_RUN_FAIL) {
+		perror("Kernel---> kern_exec_urlbug - execl - urlbug");
+		exit(FUN_RUN_FAIL);
+	}
+}
+
+
+/*-----kern_exec_textbug-----*/
+static void kern_exec_textbug(char *fdStr)
+{
+	char	txbugPath[PATH_LEN];
+
+	if(mc_conf_read("textbug_exec_locate", CONF_STR, txbugPath, PATH_LEN) == FUN_RUN_FAIL) {
+		mc_conf_print_err("textbug_exec_locate");
+		exit(FUN_RUN_FAIL);
+	}
+
+	if(execl(txbugPath, txbugPath, "-d", "-f", fdStr, NULL) == FUN_RUN_FAIL) {
+		perror("Kernel---> kern_exec_textbug - execl - textbug");
+		exit(FUN_RUN_FAIL);
+	}
+}
+
+
+/*-----kern_exec_extbug-----*/
+static void kern_exec_extbug(char *fdStr)
+{
+	char	exbugPath[PATH_LEN];
+
+	if(mc_conf_read("exbug_exec_locate", CONF_STR, exbugPath, PATH_LEN) == FUN_RUN_FAIL) {
+		mc_conf_print_err("exbug_exec_locate");
+		exit(FUN_RUN_FAIL);
+	}
+
+	if(execl(exbugPath, exbugPath, "-d", "-f", fdStr, NULL) == FUN_RUN_FAIL) {
+		perror("Kernel---> kern_exec_extbug - execl - extbug");
+		exit(FUN_RUN_FAIL);
+	}
+}
+
+
+/*-----kern_exec_outbug-----*/
+static void kern_exec_outbug(char *fdStr)
+{
+	char	oubugPath[PATH_LEN];
+
+	if(mc_conf_read("outbug_exec_locate", CONF_STR, oubugPath, PATH_LEN) == FUN_RUN_FAIL) {
+		mc_conf_print_err("outbug_exec_locate");
+		exit(FUN_RUN_FAIL);
+	}
+
+	if(execl(oubugPath, oubugPath, "-f", fdStr, NULL) == FUN_RUN_FAIL) {
+		perror("Kernel---> kern_exec_outbug - execl - outbug");
+		exit(FUN_RUN_FAIL);
+	}
+}
+
+
+/*------------------------------------------
+	Part Eight: PLC control
+
+	1. kern_part_add
+	2. kern_part_cut
+
+--------------------------------------------*/
+
+/*-----kern_part_add-----*/
+static void kern_part_add(int nId, int nPid, int nFlags, int nPipe)
+{
+	if(nPipe < 0 || nId < 0) {
+		printf("kern_part_add - wrong nId or nPipe - please check your code\n\n");
+		exit(FUN_RUN_FAIL);
+	}
+
+	mPartList[nId].p_pid = nPid;
+	mPartList[nId].p_fd = nPipe;
+	mPartList[nId].p_flags |= nFlags;
+	sp_msg_fill_stru(&mPartList[nId].p_mstru, nId, NO_MSG);
+}
+
+
+/*-----kern_part_cut-----*/
+static void kern_part_cut(PARTL *cutPart)
+{
+	cutPart->p_flags = PART_UNINIT;
+	close(cutPart->p_fd);
+}
+
+
+/*------------------------------------------
+	Part Nine: Time change part
+
+	1. kern_ctime_init
+	1. kern_ctime_part
+
+--------------------------------------------*/
+
+/*-----kern_ctime_init-----*/
+static void kern_ctime_init(void)
+{
+	struct	tm	*tStru;
+	time_t		timSec;
 
 	timSec = time(NULL);
 	tStru = localtime(&timSec);
 
-	sprintf(dateSaveBuf, "%04d%02d%02d", tStru->tm_year + 1900, tStru->tm_mon, tStru->tm_mday);
-	sprintf(minSaveBuf, "%02d", tStru->tm_min);
+	sprintf(dateSaveBuf, "%04d%02d%02d%02d", tStru->tm_year + 1900, tStru->tm_mon, tStru->tm_mday, tStru->tm_min);
 }
 
 
 /*-----kern_ctime_part-----*/
-static void kern_time_checking(ktcf ctFun)
+static void kern_ctime_part(void)
 {
-	SOCKPC	*soPeer, *foPeer;
+	struct	tm	*tStru;
+	PMSG		writeMsg;
+	time_t		timSec;
+	char		timSave[SMALL_BUF];
+	int		nCir;
+
+	timSec = time(NULL);
+	tStru = localtime(&timSec);
+
+	sprintf(timSave, "%04d%02d%02d%02d", tStru->tm_year + 1900, tStru->tm_mon, tStru->tm_mday, tStru->tm_min);
 
 	/* use for changing everyone's time */
-	if(ctFun()) {
-		for(foPeer = soPeer = kernSockServ->sv_plist; soPeer; foPeer = soPeer, soPeer = soPeer->sp_next) {
-			if(!sp_msgs_msend(kernSockServ, soPeer, PART_KERNEL, CALL_PROCESS))
-				kern_remove_socket(kernSockServ, foPeer, soPeer);
+	if(strcmp(timSave, dateSaveBuf)) {
+		strcpy(dateSaveBuf, timSave);
+
+		for(nCir = 0; nCir < PART_MAX; nCir++) {
+			if((mPartList[nCir].p_flags & PART_IC) == PART_IC) {
+				sp_msg_fill_stru(&writeMsg, CHANGE_TIME, nCir);
+
+				if(sp_msg_write(mPartList[nCir].p_fd, &writeMsg) == FUN_RUN_FAIL)
+					perror("Kernel---> ipc_main - sp_msg_write");
+			}
 		}
 	}
 }
 
 
-/*-----kern_time_switch_check-----*/
-static int kern_time_switch_check(void)
-{
-	TMS	*tStru;
-	time_t	timSec;
-	char	timSave[SMALL_BUF];
-
-	timSec = time(NULL);
-	tStru = localtime(&timSec);
-
-	sprintf(timSave, "%04d%02d%02d", tStru->tm_year + 1900, tStru->tm_mon, tStru->tm_mday);
-
-	if(strcmp(timSave, dateSaveBuf)) {
-		strcpy(dateSaveBuf, timSave);
-		return	FUN_RUN_OK;
-	}
-
-	return	 FUN_RUN_END;
-}
-
-
-/*----kern_time_call_check-----*/
-static int kern_time_call_check(void)
-{
-	TMS	*tStru;
-	time_t	timSec;
-	char	minSave[SMALL_BUF];
-
-	timSec = time(NULL);
-	tStru = localtime(&timSec);
-
-	sprintf(minSave, "%02d", tStru->tm_min);
-
-	if(strcmp(minSave, minSaveBuf)) {
-		strcpy(minSaveBuf, minSave);
-		return	FUN_RUN_OK;
-	}
-
-	return	 FUN_RUN_END;
-}
-
-
 /*------------------------------------------
-	Part Eight: Process control
+	Part Ten: Help
 
-	1. kern_remove_socket
+	1. kern_print_help
 
 --------------------------------------------*/
 
-/*-----kern_remove_socket-----*/
-static void kern_remove_socket(SOCKSV *pServ, SOCKPC *pForward, SOCKPC *pRemove)
+/*-----kern_print_help-----*/
+static void kern_print_help(void)
 {
-	printf("Kernel---> Process: %d - Own: %d down\n", pRemove->sp_info.s_pid, pRemove->sp_info.s_own);
-
-	if(pRemove == pServ->sv_plist) {
-		pServ->sv_plist = pRemove->sp_next;
-
-	} else {
-		pForward->sp_next = pRemove->sp_next;
-	}
-
-	mmdp_free(kernMemPool, (mpt_t *)pRemove);
-
-	close(pRemove->sp_sock);
-	pServ->sv_npeer--;
+	printf("usage: \r\t[-u or --urlbug] urlbug\n \
+		\r\t[-t or --textbug] textbug\n \
+		\r\t[-e or --extbug] extbug\n \
+		\r\t[-o or --outbug] outbug\n \
+		\r\t[-h or --help]\n\n");
 }
 
-
-/*------------------------------------------
-	Part Ten: Error handler
-
-	1. kern_perror
-
---------------------------------------------*/
-
-/*-----kern_perror-----*/
-static void kern_perror(char *errStr, int nError)
-{
-	printf("Kernel---> %s: %s\n", errStr, strerror(nError));
-}

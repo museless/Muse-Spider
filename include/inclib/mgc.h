@@ -53,6 +53,4 @@ int	mgc_one_init(MGCO *pMgco, gcfun pCleaner, int nLimit);
 int	mgc_one_add(MGCO *pMgco, void *pObj);
 void	mgc_one_clean(MGCO *pMgco);
 
-void	mgc_close(void *pFd);
-
 #endif
